@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LabTrack</title>
+<style>
+:root{--bg:#eceff3;--c:#fff;--t:#14213d;--m:#66718a;--p:#2b4acb;--b:#d3d9e3;--r:#b42318;--g:#067647}
+*{box-sizing:border-box}body{margin:0;font:15px Roboto,system-ui,sans-serif;background:var(--bg);color:var(--t)}
+header{background:var(--t);color:#fff;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header b{font-size:18px;letter-spacing:.3px;margin-right:auto}header small{color:#aab4cc}
+nav{display:flex;gap:6px;padding:8px 12px;background:var(--c);border-bottom:1px solid var(--b)}nav button{flex:1}
+main{padding:12px;max-width:1100px;margin:auto}
+.card{background:var(--c);border:1px solid var(--b);border-radius:6px;padding:12px;margin-bottom:12px}
+h2,h3{margin:0 0 8px}
+button{font:inherit;border:0;border-radius:6px;padding:8px 12px;background:var(--p);color:#fff}
+button.g,nav button{background:#e3e8f0;color:var(--t)}nav button.on{background:var(--p);color:#fff}button.d{background:var(--r)}
+input,select,textarea{font:inherit;padding:8px;border:1px solid var(--b);border-radius:6px;background:#fff;color:var(--t);max-width:100%}
+label{display:block;margin:8px 0;color:var(--m);font-size:13px}label input,label select{display:block;width:100%;margin-top:3px}
+.ck{display:flex;gap:8px;align-items:center;color:var(--t);font-size:15px}.ck input{width:auto;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.row label{margin:0}
+.w{overflow-x:auto;border:1px solid var(--b);border-radius:6px;background:var(--c)}
+table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--b);white-space:nowrap;text-align:center}
+th{background:#e8ecf3;font-size:12px}td.n,th.n{text-align:left;position:sticky;left:0;border-right:1px solid var(--b)}td.n{background:#fff}th.n{background:#e8ecf3}
+td input{width:64px;padding:5px;text-align:center}td.k{background:#eef1f7}
+.s{width:36px;height:34px;padding:0;background:#e3e8f0;color:var(--t);font-size:16px}.s.P{background:#d1fadf;color:var(--g)}.s.A{background:#fee4e2;color:var(--r)}
+.ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}.ov .card{width:100%;max-width:420px;max-height:90vh;overflow:auto;margin:0}
+pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
+.e{color:var(--r)}.m{color:var(--m);font-size:13px}
+</style></head><body>
+<div id="app"></div><div id="modal"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
+const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
+let S={tab:'att',lab:'',gl:'',admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started;
+
+/* ---------- start-up, setup, login ---------- */
+const CFG={apiKey:"AIzaSyAxgPrBcVszBieseQXfaz5JqcO_UAAopg0",authDomain:"labtrack-c55fb.firebaseapp.com",projectId:"labtrack-c55fb",storageBucket:"labtrack-c55fb.firebasestorage.app",messagingSenderId:"561200653207",appId:"1:561200653207:web:e7cb27d82c1b97e3575ad2"};
+function boot(){const c=localStorage.fbc||JSON.stringify(CFG);
+ try{firebase.initializeApp(JSON.parse(c));auth=firebase.auth();db=firebase.firestore()}catch(e){return setup('Config problem: '+e.message)}
+ auth.onAuthStateChanged(u=>{S.user=u;u?start():login()})}
+function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack setup</h2>
+<p class=m>1. At firebase.google.com create a project and add a Web app. Copy its firebaseConfig.<br>2. Build, Authentication: enable Email/Password, then add each instructor under Users.<br>3. Build, Firestore Database: create it, open Rules, paste this and Publish.</p>
+<pre>rules_version = '2';
+service cloud.firestore {
+ match /databases/{d}/documents {
+  match /{x=**} {
+   allow read, write: if request.auth != null;
+  }
+ }
+}</pre>
+<label>Paste your firebaseConfig here<textarea id=cfgt rows=7 style="width:100%"></textarea></label>
+<p class=e>${esc(err)}</p><button onclick=saveCfg()>Save and continue</button></div></main>`}
+function saveCfg(){const o={};for(const m of $('#cfgt').value.matchAll(/(\w+)\s*:\s*["']([^"']+)["']/g))o[m[1]]=m[2];
+ if(!o.apiKey||!o.projectId)return setup('apiKey or projectId not found. Paste the whole config.');localStorage.fbc=JSON.stringify(o);location.reload()}
+function login(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack</h2><label>Email<input id=em type=email></label><label>Password<input id=pw type=password></label>
+<p class=e>${esc(err)}</p><div class=row><button onclick=signIn()>Sign in</button><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div>
+<p class=m>The first person to sign in becomes the admin.</p></div></main>`}
+function signIn(){auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(e=>login(e.message))}
+function start(){if(started)return;started=1;
+ db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set({weeks:12,locked:{},items:DEF,admins:[S.user.uid]});S.cfg=d.data();S.admin=S.cfg.admins.includes(S.user.uid);render()},e=>alert(e.message));
+ db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));if(!S.labs.find(l=>l.id===S.lab))S.lab=S.labs[0]?.id||'';render()});
+ db.collection('students').onSnapshot(q=>{S.studs=q.docs.map(d=>({_:d.id,...d.data()}));render()})}
+
+/* ---------- helpers ---------- */
+const LS=l=>S.studs.filter(s=>!l||s.lab===l).sort((a,b)=>String(a.sn).localeCompare(String(b.sn),undefined,{numeric:true})||String(a.nm).localeCompare(String(b.nm)));
+const St=id=>db.collection('students').doc(id),Cf=()=>db.doc('cfg/main');
+function calc(s){const m={},it=S.cfg.items,g=s.g||{};
+ const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
+  if(i.t=='in')r=g[k]===undefined||g[k]===''?null:+g[k];
+  else if(i.t=='att'){const a=Object.values(s.att||{}),p=a.filter(x=>x=='P').length,b=a.filter(x=>x=='A').length;r=i.mode=='pen'?Math.max(0,i.max-b*i.pen):p/S.cfg.weeks*i.max}
+  else if(i.t=='grp'){let xs=(i.src||[]).map(v).filter(x=>x!==null).sort((a,b)=>b-a);if(i.top>0)xs=xs.slice(0,i.top);
+   if(xs.length){r=xs.reduce((a,b)=>a+b,0);if(i.agg=='avg')r/=xs.length;r*=i.mul}}
+  else if(i.t=='sum')r=(i.src||[]).reduce((a,k)=>a+(v(k)||0),0);
+  return m[k]=r===null?null:Math.round(r*100)/100};
+ it.forEach(i=>v(i.k));return m}
+
+/* ---------- main view ---------- */
+function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
+ $('#app').innerHTML=`<header><b>LabTrack</b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+<nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
+<main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
+ if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
+
+/* ---------- attendance ---------- */
+function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks;
+ const top=`<div class=card><div class=row><select onchange="S.lab=this.value;render()">${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.lab?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>No labs yet</option>'}</select><button onclick=addLab()>Add lab</button>${l?'<button class=d onclick=delLab()>Remove lab</button>':''}</div>`;
+ if(!l)return top+'<p class=m>Add your first lab to start.</p></div>';
+ return top+`<div class=row><label>Date<input type=date data-f=ld value="${esc(l.date)}" onchange="db.doc('labs/${l.id}').update({date:this.value})"></label>
+<label>Place<input data-f=lp value="${esc(l.place)}" onchange="db.doc('labs/${l.id}').update({place:this.value})"></label></div>
+<div class=row><input id=a1 data-f=a1 placeholder=Serial style=width:70px><input id=a2 data-f=a2 placeholder=ID style=width:110px><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div>
+<div class=row><input type=file id=f1 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)">
+<button class=g onclick="$('#f1').click()">Upload names (Excel)</button><button class=g onclick="$('#f2').click()">Upload serials (Excel)</button><button class=g onclick=exLab()>Export lab Excel</button></div>
+<p class=m>Tap a cell to cycle: present, absent, empty.${S.admin?' Tap a week header to lock or unlock it.':''}</p></div>
+<div class=w><table><tr><th>#<th>ID<th class=n>Name${rng(W).map(w=>`<th onclick="lock(${w})" ${S.admin?'style=cursor:pointer':''}>W${w}${S.cfg.locked?.[w]?' &#128274;':''}`).join('')}<th>Att<th>Abs<th></tr>
+${LS(l.id).map(s=>{const a=s.att||{},c=v=>rng(W).filter(w=>a[w]===v).length;
+ return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${rng(W).map(w=>`<td><button class="s ${a[w]||''}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="mark('${s._}',${w},'${a[w]||''}')">${a[w]=='P'?'&#10003;':a[w]=='A'?'&#10007;':'&middot;'}</button>`).join('')}<td>${c('P')}<td>${c('A')}<td><button class="g s" onclick="delSt('${s._}')">&#10005;</button>`}).join('')}</table></div>`}
+function mark(id,w,cur){const n=cur==''?'P':cur=='P'?'A':'';St(id).update({['att.'+w]:n==''?FV():n})}
+function lock(w){if(S.admin)Cf().update({['locked.'+w]:!S.cfg.locked?.[w]})}
+function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),date:'',place:''}).then(r=>{S.lab=r.id})}
+function delLab(){if(!confirm('Remove this lab and all its students?'))return;const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));b.commit()}
+function addSt(){const n=$('#a3').value.trim(),i=$('#a2').value.trim();if(!n&&!i)return;db.collection('students').add({lab:S.lab,sn:$('#a1').value.trim(),sid:i,nm:n,att:{},g:{}})}
+function delSt(id){if(confirm('Remove this student?'))St(id).delete()}
+
+/* ---------- Excel import / export ---------- */
+function parse(rows){if(!rows.length)return[];const h=rows[0].map(x=>String(x).toLowerCase().trim()),f=r=>h.findIndex(x=>r.test(x));
+ let c={sn:f(/serial|^sn$|^no\.?$|^#$/),sid:f(/\bid\b|code/),nm:f(/name/)},st=1;
+ if(c.sid<0&&c.nm<0){st=0;c=rows[0].length>2?{sn:0,sid:1,nm:2}:{sn:-1,sid:0,nm:1}}
+ return rows.slice(st).filter(r=>r.some(x=>x!=='')).map(r=>({sn:c.sn<0?'':r[c.sn],sid:c.sid<0?'':String(r[c.sid]).trim(),nm:c.nm<0?'':String(r[c.nm]).trim()}))}
+function imp(inp,kind){const f=inp.files[0];if(!f)return;const r=new FileReader();
+ r.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'}),rows=parse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}));
+  const b=db.batch(),col=db.collection('students');let add=0,upd=0,miss=0;
+  const find=(r,pool)=>pool.find(s=>r.sid?s.sid===r.sid:r.nm&&String(s.nm).toLowerCase()===r.nm.toLowerCase());
+  rows.forEach(r=>{
+   if(kind==0){const s=find(r,LS(S.lab));
+    if(s){const u={};if(r.nm)u.nm=r.nm;if(r.sn!=='')u.sn=r.sn;if(Object.keys(u).length)b.update(col.doc(s._),u);upd++}
+    else{b.set(col.doc(),{lab:S.lab,sn:r.sn,sid:r.sid,nm:r.nm,att:{},g:{}});add++}}
+   else{const s=find(r,S.studs);if(s&&r.sn!==''){b.update(col.doc(s._),{sn:r.sn});upd++}else miss++}});
+  b.commit().then(()=>alert(kind?`Serials updated: ${upd}. Not found: ${miss}.`:`Students added: ${add}. Updated: ${upd}.`)).catch(e=>alert(e.message));inp.value=''};
+ r.readAsArrayBuffer(f)}
+function save(rows,name){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name.replace(/[^\w-]+/g,'_')+'.xlsx')}
+function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab',l.name],['Date',l.date||''],['Place',l.place||''],[],['Serial','ID','Name',...rng(W).map(w=>'Week '+w),'Attended sessions','Absent sessions']];
+ LS(l.id).forEach(s=>{const a=s.att||{},c=v=>rng(W).filter(w=>a[w]===v).length;rows.push([s.sn,s.sid,s.nm,...rng(W).map(w=>a[w]=='P'?'Attended':a[w]=='A'?'Absent':''),c('P'),c('A')])});save(rows,'Lab_'+l.name)}
+function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];
+ LS(S.gl).forEach(s=>{const m=calc(s);rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>m[i.k]??'')])});save(rows,'Grades')}
+
+/* ---------- grades ---------- */
+function vGr(){const it=S.cfg.items;
+ return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button class=g onclick=exGr()>Export grades Excel</button></div>
+<p class=m>Shaded columns are calculated. Blank scores are ignored in groups and count as 0 in sums.</p></div>
+<div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}</tr>
+${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input type=number step=any data-f="${s._}_${i.k}" value="${m[i.k]??''}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}`}).join('')}</table></div>`}
+function setG(id,k,v){St(id).update({['g.'+k]:v===''?FV():+v})}
+
+/* ---------- settings ---------- */
+function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
+ const desc=i=>i.t=='att'?(i.mode=='pen'?`max minus ${i.pen} per absence`:'attended / weeks x max'):i.t=='grp'?`${i.agg=='avg'?'average':'sum'} of ${i.top?'highest '+i.top+' of ':''}${(i.src||[]).map(nm).join(', ')}${i.mul!=1?' x '+i.mul:''}`:i.t=='sum'?(i.src||[]).map(nm).join(' + '):'';
+ return `<div class=card><h3>Course settings</h3>${S.admin?'':'<p class=m>Only the admin can change settings and lock weeks.</p>'}
+<label>Number of weeks<input type=number min=1 max=30 ${S.admin?'':'disabled'} value="${c.weeks}" onchange="Cf().update({weeks:+this.value||12})"></label></div>
+<div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
+${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
+<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>`}
+function editItem(k,t){const i=k?{...S.cfg.items.find(x=>x.k===k)}:{k:'c'+Date.now(),t,n:'',max:10,src:[],top:0,agg:'avg',mul:1,mode:'ratio',pen:1},o=S.cfg.items.filter(x=>x.k!==i.k),sel=(a,b)=>a==b?'selected':'';
+ $('#modal').innerHTML=`<div class=ov><div class=card><h3>${k?'Edit':'New'} item</h3>
+<label>Name<input id=m_n value="${esc(i.n)}"></label><label>Max grade<input id=m_max type=number step=any value="${i.max}"></label>
+${i.t=='att'?`<label>Rule<select id=m_mode><option value=ratio ${sel(i.mode,'ratio')}>Attended / weeks x max</option><option value=pen ${sel(i.mode,'pen')}>Max minus marks per absence</option></select></label><label>Marks lost per absence<input id=m_pen type=number step=any value="${i.pen}"></label>`:''}
+${i.t=='grp'||i.t=='sum'?`<p class=m>Use these items:</p>${o.map(x=>`<label class=ck><input type=checkbox value="${x.k}" ${(i.src||[]).includes(x.k)?'checked':''}>${esc(x.n)}</label>`).join('')}`:''}
+${i.t=='grp'?`<label>Highest N only (0 = all)<input id=m_top type=number value="${i.top}"></label><label>Combine by<select id=m_agg><option value=avg ${sel(i.agg,'avg')}>Average</option><option value=sum ${sel(i.agg,'sum')}>Sum</option></select></label><label>Multiply result by<input id=m_mul type=number step=any value="${i.mul}"></label>`:''}
+<div class=row><button onclick="saveItem('${i.k}','${i.t}')">Save item</button><button class=g onclick="$('#modal').innerHTML=''">Cancel</button></div></div></div>`}
+function saveItem(k,t){const g=x=>$('#m_'+x)?.value,i={k,t,n:g('n')||'Item',max:+g('max')||0};
+ if(t=='att'){i.mode=g('mode');i.pen=+g('pen')||0}
+ if(t=='grp'||t=='sum')i.src=[...document.querySelectorAll('#modal input[type=checkbox]:checked')].map(x=>x.value);
+ if(t=='grp'){i.top=+g('top')||0;i.agg=g('agg');i.mul=g('mul')===''?1:+g('mul')}
+ const it=S.cfg.items.slice(),x=it.findIndex(y=>y.k===k);x<0?it.push(i):it[x]=i;Cf().update({items:it});$('#modal').innerHTML=''}
+function delItem(k){if(!confirm('Remove this item?'))return;Cf().update({items:S.cfg.items.filter(i=>i.k!==k).map(i=>i.src?{...i,src:i.src.filter(x=>x!==k)}:i)})}
+boot();
+</script></body></html>
