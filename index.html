@@ -95,7 +95,7 @@ function calc(s){const m={},it=S.cfg.items,g=s.g||{};
 
 /* ---------- main view ---------- */
 function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v8</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v9</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
 <nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
 <main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
@@ -150,7 +150,7 @@ function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab'
 function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
 
 /* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v8)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v9)</button><button class=g onclick=exGr()>Export simple grades</button></div>
 ${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10px;margin-top:10px"><span class=m>Focus grading:</span><select class=compact onchange="S.gfk=this.value">${inp.map(i=>`<option value="${i.k}" ${i.k===S.gfk?'selected':''}>${esc(i.n)}</option>`).join('')}</select><button onclick=startGradeFocus()>Start focus mode</button><span class=m>${S.gl?'Selected lab':'All students'}</span></div>`:''}
 <p class=m>Use ABS beside any score when a student was absent. ABS counts as 0 in calculated groups/sums; a blank score stays unentered.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
@@ -216,7 +216,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v8.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v9.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
@@ -229,15 +229,28 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   const xr=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const xe=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const cleanAttrs=a=>(' '+String(a||'').trim()).replace(/\s+t="[^"]*"/g,'').replace(/^\s*/,' ');
+
+  // Microsoft Excel is much stricter than Google Sheets about the Shared String Table.
+  // Earlier LabTrack builds changed many template cells from shared strings to inlineStr
+  // while leaving the template's sharedStrings metadata unchanged. Google Sheets repairs
+  // that silently, but Excel can reject the package. V9 keeps Excel-style shared strings.
+  const sstPath='xl/sharedStrings.xml',sstFile=zip.file(sstPath);
+  if(!sstFile)throw new Error('Template is missing xl/sharedStrings.xml');
+  let sstXml=await sstFile.async('string');
+  const sstDoc=new DOMParser().parseFromString(sstXml,'application/xml');
+  if(sstDoc.getElementsByTagName('parsererror').length)throw new Error('Template sharedStrings.xml is invalid.');
+  const sis=[...sstDoc.getElementsByTagName('si')],sharedMap=new Map();
+  sis.forEach((si,i)=>{const txt=[...si.getElementsByTagName('t')].map(x=>x.textContent||'').join('');if(!sharedMap.has(txt))sharedMap.set(txt,i)});
+  const addedStrings=[];
+  const sharedIndex=v=>{v=String(v??'');if(sharedMap.has(v))return sharedMap.get(v);const i=sis.length+addedStrings.length;sharedMap.set(v,i);addedStrings.push(v);return i};
+
   const make=(ref,attrs,v,kind='auto')=>{attrs=cleanAttrs(attrs||('r="'+ref+'"'));if(!/\br="[^"]+"/.test(attrs))attrs+=' r="'+ref+'"';
    if(v===''||v==null)return '<c'+attrs+'></c>';
-   if(kind==='text')return '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xe(v)+'</t></is></c>';
+   if(kind==='text'){const i=sharedIndex(v);return '<c'+attrs+' t="s"><v>'+i+'</v></c>'}
    const n=typeof v==='number'?v:(typeof v==='string'&&/^-?\d+(?:\.\d+)?$/.test(v.trim())?+v:NaN);
    if(kind==='number'||!Number.isNaN(n))return '<c'+attrs+'><v>'+String(kind==='number'?+v:n)+'</v></c>';
-   return '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xe(v)+'</t></is></c>'};
+   const i=sharedIndex(v);return '<c'+attrs+' t="s"><v>'+i+'</v></c>'};
   const patchCell=(row,ref,v,kind='auto')=>{
-   // Self-closing cells MUST be matched first. Matching the normal-cell branch first can
-   // swallow the following cells and silently corrupt the worksheet.
    const re=new RegExp('<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)\\s*\\/>|<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)>([\\s\\S]*?)<\\/c>');
    const hit=row.match(re);if(!hit)throw new Error('Template cell '+ref+' is missing.');
    return row.replace(re,make(ref,hit[1]||hit[2],v,kind));
@@ -250,8 +263,6 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
    2:[['E2',cr.code,'text'],['H2',cr.name,'text'],['M2',cr.ch,'auto'],['O2',cr.inst,'text']],
    4:[['D4',mx('mid'),'number'],['E4',mx('cw'),'number'],['F4',mx('pr'),'number'],['G4',G,'number'],['H4',mx('fin'),'number'],['I4',G+mx('fin'),'number']]
   };
-  // The source template has a handful of manually yellow-highlighted student rows.
-  // These style IDs are the matching non-yellow styles from the same template.
   const unyellow={65:47,66:61,67:89,68:48,69:24,70:25,71:26,72:51,73:31,74:34,75:46,76:33,77:28,78:29,79:32,80:0,81:0};
   const clearManualYellow=row=>row.replace(/(<c\b[^>]*\bs=")(\d+)("[^>]*>)/g,(a,p,n,q)=>unyellow[n]!==undefined?p+unyellow[n]+q:a);
 
@@ -268,16 +279,11 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
    return row;
   });
 
-  // Every COUNTIF/COUNTIFS data range now ends at the last exported student.
-  // Student data always starts on row 5. This also normalizes old template ranges
-  // that accidentally began on row 3 or 4. Single-cell references such as H4/G4
-  // (maximum marks) are intentionally left unchanged.
   const lastDataRow=Math.max(5,4+ss.length);
   const dynamicCountifRanges=(sheetXml,allowLocal)=>sheetXml.replace(/<f\b([^>]*)>([\s\S]*?)<\/f>/g,(whole,attrs,formula)=>{
    if(!/\bCOUNTIFS?\s*\(/i.test(formula))return whole;
    const changed=formula.replace(/((?:'Program_Course Code'!)?)(\$?)([A-Z]{1,3})(\$?)\d+:(\$?)([A-Z]{1,3})(\$?)\d+/g,(ref,prefix,a1,c1,r1,a2,c2,r2)=>{
-    if(c1!==c2)return ref;
-    if(!prefix&&!allowLocal)return ref;
+    if(c1!==c2)return ref;if(!prefix&&!allowLocal)return ref;
     return prefix+a1+c1+r1+'5:'+a2+c2+r2+lastDataRow;
    });
    return '<f'+attrs+'>'+changed+'</f>';
@@ -289,35 +295,37 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   if(rowCountAfter!==rowCountBefore)throw new Error('Worksheet row integrity check failed. No Excel file was created.');
   const chk=new DOMParser().parseFromString(xml,'application/xml');
   if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
-  // Cached formula results belong to the old template data. Remove them safely so
-  // Excel/Sheets recomputes formulas from the newly exported grades instead of seeing stale values.
-  const clearFormulaCaches=sx=>sx.replace(/<c\b([^>]*?)\/>|<c\b([^>]*?)>([\s\S]*?)<\/c>/g,(whole,selfAttrs,attrs,body)=>{
-   if(selfAttrs!==undefined||!body||!/<f\b/.test(body))return whole;
-   return '<c'+attrs+'>'+body.replace(/<v>[\s\S]*?<\/v>/g,'')+'</c>';
-  });
-  xml=clearFormulaCaches(xml);
   zip.file(P+'1.xml',xml);
 
-  // Apply the same dynamic COUNTIF/COUNTIFS ranges to all four statistics sheets.
-  // Their formulas continue to point at Program_Course Code, but only through the
-  // final populated student row instead of the template's fixed row 713.
+  // Update only the COUNTIF/COUNTIFS ranges in the statistic sheets. V9 deliberately
+  // keeps Excel's cached formula results and calcChain intact; the formula cells are
+  // the same cells as in the template and Excel can recalculate them on open.
   for(let k=2;k<=5;k++){
-   const path=P+k+'.xml',sx=clearFormulaCaches(dynamicCountifRanges(await rd(path),false));
+   const path=P+k+'.xml',sx=dynamicCountifRanges(await rd(path),false);
    const parsed=new DOMParser().parseFromString(sx,'application/xml');
    if(parsed.getElementsByTagName('parsererror').length)throw new Error('Statistics sheet '+k+' became invalid. No Excel file was created.');
    zip.file(path,sx);
   }
 
-  // Formula text changed, so discard Excel's stale calculation chain and let Excel rebuild it.
-  // This is safer for Microsoft Excel than keeping a calcChain created for the old formulas.
-  zip.remove('xl/calcChain.xml');
-  const relPath='xl/_rels/workbook.xml.rels',relFile=zip.file(relPath);if(relFile){let rx=await relFile.async('string');rx=rx.replace(/<Relationship\b[^>]*(?:Type="[^"]*\/calcChain"|Target="calcChain\.xml")[^>]*\/>/g,'');zip.file(relPath,rx)}
-  const ctPath='[Content_Types].xml',ctFile=zip.file(ctPath);if(ctFile){let cx=await ctFile.async('string');cx=cx.replace(/<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g,'');zip.file(ctPath,cx)}
+  // Append any new strings to the template's Shared String Table. count/uniqueCount are
+  // optional OOXML attributes, so remove them instead of leaving stale values after the
+  // roster was shortened/changed. This is the key Excel-compatibility repair in V9.
+  if(addedStrings.length){
+   const extra=addedStrings.map(v=>'<si><t xml:space="preserve">'+xe(v)+'</t></si>').join('');
+   sstXml=sstXml.replace(/<\/sst>\s*$/,extra+'</sst>');
+  }
+  sstXml=sstXml.replace(/(<sst\b[^>]*?)\s+count="[^"]*"/,'$1').replace(/(<sst\b[^>]*?)\s+uniqueCount="[^"]*"/,'$1');
+  const sstCheck=new DOMParser().parseFromString(sstXml,'application/xml');
+  if(sstCheck.getElementsByTagName('parsererror').length)throw new Error('Generated sharedStrings.xml is invalid. No Excel file was created.');
+  zip.file(sstPath,sstXml);
+
+  // Keep the original calcChain and package relationships. We only request a fresh
+  // calculation; we do not delete Excel package parts or cached results.
   const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);if(wbFile){let wx=await wbFile.async('string');if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');else wx=wx.replace('</workbook>','<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/></workbook>');zip.file(wbPath,wx)}
 
-  const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
+  const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6},platform:'DOS'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('LabTrack v7 — Excel export failed safely: '+e.message)}
+ }catch(e){console.error(e);alert('LabTrack v9 — Excel export failed safely: '+e.message)}
 }
 boot();
 </script></body></html>
