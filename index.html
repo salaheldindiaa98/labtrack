@@ -31,6 +31,10 @@ td input{width:64px;padding:5px;text-align:center}td.k{background:#eef1f7}
 .focusgrade{max-width:420px;margin:22px auto 0}.focusgrade input{width:100%;font-size:clamp(34px,9vw,58px);font-weight:700;text-align:center;padding:16px;border-width:2px}.focusgrade .max{font-size:16px;color:var(--m);margin-top:6px}.focusgradeactions{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:12px}.focusgradeactions button{min-height:58px;font-size:18px;font-weight:700}.focusgradeactions .absent{background:var(--r)}
 .focusnav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px}.focusnav button{min-width:110px}.focusdone{padding:40px 12px;text-align:center}.focusdone .big{font-size:54px}.focusdone h2{font-size:32px;margin:8px 0}
 @media(max-width:520px){.focuspanel{padding:10px}.focuscard{border-radius:14px}.focusactions{grid-template-columns:1fr}.focusactions button{min-height:72px}.focusgradeactions{grid-template-columns:1fr}.focushead button{padding:8px 10px}}
+
+.authwrap{min-height:100vh;display:grid;place-items:center;padding:18px}.authcard{width:100%;max-width:460px}.authbrand{text-align:center;margin-bottom:14px}.authbrand h1{margin:0;font-size:30px}.authbrand p{margin:5px 0 0;color:var(--m)}.authseg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#e3e8f0;padding:4px;border-radius:9px;margin:14px 0}.authseg button{background:transparent;color:var(--t);padding:8px}.authseg button.on{background:#fff;box-shadow:0 1px 4px #14213d1a}.authcard .wide{width:100%;margin-top:6px}.authlink{background:transparent;color:var(--p);padding:4px 0}.accountstate{text-align:center;padding:22px 12px}.accountstate .ico{font-size:48px;margin-bottom:8px}.accountstate h2{margin:0 0 8px}.insgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}.statbox{border:1px solid var(--b);border-radius:8px;padding:10px;text-align:center;background:#fff}.statbox b{display:block;font-size:24px}.status.pending{background:#fff3cd;color:#8a5b00}.status.approved{background:#d1fadf;color:var(--g)}.status.rejected{background:#fee4e2;color:var(--r)}.instructorrow{display:grid;grid-template-columns:minmax(170px,1.5fr) minmax(180px,1.5fr) 110px minmax(190px,auto);gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--b)}.instructorrow:last-child{border-bottom:0}.instructorrow .who{min-width:0}.instructorrow .who b,.instructorrow .who span{display:block;overflow:hidden;text-overflow:ellipsis}.rulesbox{white-space:pre-wrap;max-height:360px}
+@media(max-width:720px){.instructorrow{grid-template-columns:1fr}.instructorrow>div:nth-child(2){font-size:13px;color:var(--m)}.insgrid{grid-template-columns:1fr 1fr 1fr}}
+
 .ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}.ov .card{width:100%;max-width:420px;max-height:90vh;overflow:auto;margin:0}
 pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
 .e{color:var(--r)}.m{color:var(--m);font-size:13px}
@@ -42,39 +46,110 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-const APP_VERSION='8.0';
+const APP_VERSION='10.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
-let S={tab:'att',lab:'',gl:'',aw:1,gfk:'',admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started,FO=null;
+let S={tab:'att',lab:'',gl:'',aw:1,gfk:'',admin:false,cfg:null,labs:[],studs:[],user:null,profile:null,instructors:[]},db,auth,started=0,FO=null,unsubs=[],insUnsub=null,profileUnsub=null,signupBusy=false;
 
-/* ---------- start-up, setup, login ---------- */
+/* ---------- start-up, setup, account access ---------- */
 const CFG={apiKey:"AIzaSyAxgPrBcVszBieseQXfaz5JqcO_UAAopg0",authDomain:"labtrack-c55fb.firebaseapp.com",projectId:"labtrack-c55fb",storageBucket:"labtrack-c55fb.firebasestorage.app",messagingSenderId:"561200653207",appId:"1:561200653207:web:e7cb27d82c1b97e3575ad2"};
+const SEC_RULES=`rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function admin() {
+   return signedIn()
+    && exists(/databases/$(database)/documents/cfg/main)
+    && request.auth.uid in get(/databases/$(database)/documents/cfg/main).data.admins;
+  }
+  function approved() {
+   return signedIn()
+    && exists(/databases/$(database)/documents/instructors/$(request.auth.uid))
+    && get(/databases/$(database)/documents/instructors/$(request.auth.uid)).data.approved == true
+    && get(/databases/$(database)/documents/instructors/$(request.auth.uid)).data.status == 'approved';
+  }
+
+  match /instructors/{uid} {
+   allow get: if signedIn() && (request.auth.uid == uid || admin());
+   allow list: if admin();
+   allow create: if admin() || (signedIn() && request.auth.uid == uid
+    && request.resource.data.approved == false
+    && request.resource.data.status == 'pending'
+    && request.resource.data.role == 'instructor'
+    && request.resource.data.email == request.auth.token.email);
+   allow update, delete: if admin();
+  }
+
+  match /cfg/main {
+   allow get: if signedIn() && (!exists(/databases/$(database)/documents/cfg/main) || approved() || admin());
+   allow create: if signedIn() && !exists(/databases/$(database)/documents/cfg/main)
+    && request.resource.data.admins.size() == 1
+    && request.resource.data.admins[0] == request.auth.uid;
+   allow update: if admin() || (approved()
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['altLabLimit','absenceWarn']));
+  }
+  match /cfg/template {
+   allow read: if approved() || admin();
+   allow write: if admin();
+  }
+  match /labs/{id} { allow read, write: if approved() || admin(); }
+  match /students/{id} { allow read, write: if approved() || admin(); }
+ }
+}`;
+const defaultCfg=uid=>({weeks:12,locked:{},items:DEF,admins:[uid],altLabLimit:2,absenceWarn:3});
+const ts=()=>firebase.firestore.FieldValue.serverTimestamp();
+function stopLive(){unsubs.splice(0).forEach(u=>{try{u()}catch(_){}});if(insUnsub){try{insUnsub()}catch(_){ }insUnsub=null}started=0;S.cfg=null;S.labs=[];S.studs=[];S.instructors=[]}
+function stopProfileWatch(){if(profileUnsub){try{profileUnsub()}catch(_){ }profileUnsub=null}}
 function boot(){const c=localStorage.fbc||JSON.stringify(CFG);
  try{firebase.initializeApp(JSON.parse(c));auth=firebase.auth();db=firebase.firestore()}catch(e){return setup('Config problem: '+e.message)}
- auth.onAuthStateChanged(u=>{S.user=u;u?start():login()})}
+ auth.onAuthStateChanged(async u=>{S.user=u||null;if(signupBusy)return;if(!u){stopLive();stopProfileWatch();S.profile=null;return login()}await gateUser(u)})}
 function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack setup</h2>
-<p class=m>1. At firebase.google.com create a project and add a Web app. Copy its firebaseConfig.<br>2. Build, Authentication: enable Email/Password, then add each instructor under Users.<br>3. Build, Firestore Database: create it, open Rules, paste this and Publish.</p>
-<pre>rules_version = '2';
-service cloud.firestore {
- match /databases/{d}/documents {
-  match /{x=**} {
-   allow read, write: if request.auth != null;
-  }
- }
-}</pre>
+<p class=m>1. In Firebase create a Web app and copy its firebaseConfig.<br>2. Authentication → Sign-in method: enable <b>Email/Password</b>. You do not need to add instructors under Firebase Users.<br>3. Firestore Database → Rules: paste the secure rules below and Publish. The first LabTrack account created in a new database becomes the admin; later accounts wait for admin approval.</p>
+<pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy security rules</button>
 <label>Paste your firebaseConfig here<textarea id=cfgt rows=7 style="width:100%"></textarea></label>
 <p class=e>${esc(err)}</p><button onclick=saveCfg()>Save and continue</button></div></main>`}
 function saveCfg(){const o={};for(const m of $('#cfgt').value.matchAll(/(\w+)\s*:\s*["']([^"']+)["']/g))o[m[1]]=m[2];
  if(!o.apiKey||!o.projectId)return setup('apiKey or projectId not found. Paste the whole config.');localStorage.fbc=JSON.stringify(o);location.reload()}
-function login(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack</h2><label>Email<input id=em type=email></label><label>Password<input id=pw type=password></label>
-<p class=e>${esc(err)}</p><div class=row><button onclick=signIn()>Sign in</button><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div>
-<p class=m>The first person to sign in becomes the admin.</p></div></main>`}
-function signIn(){auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(e=>login(e.message))}
+async function copyRules(){try{await navigator.clipboard.writeText(SEC_RULES);alert('Security rules copied. Paste them in Firebase → Firestore Database → Rules and press Publish.')}catch(_){alert('Copy failed. Select the rules text and copy it manually.')}}
+function login(err='',mode='signin',note=''){$('#app').innerHTML=`<div class=authwrap><div class="card authcard"><div class=authbrand><h1>LabTrack</h1><p>Instructor access · v10</p></div>
+<div class=authseg><button class="${mode==='signin'?'on':''}" onclick="login('','signin')">Sign in</button><button class="${mode==='signup'?'on':''}" onclick="login('','signup')">Create account</button></div>
+${mode==='signup'?`<label>Full name<input id=nm autocomplete=name placeholder="Instructor name"></label><label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=new-password minlength=6></label><label>Confirm password<input id=pw2 type=password autocomplete=new-password minlength=6></label><button class=wide onclick=signUp()>Create LabTrack account</button><p class=m>Your account will remain pending until a LabTrack admin approves it.</p>`:mode==='forgot'?`<h3>Reset password</h3><label>Email<input id=em type=email autocomplete=email></label><button class=wide onclick=sendReset()>Send reset email</button><button class="authlink wide" onclick="login('','signin')">Back to sign in</button>`:`<label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=current-password onkeydown="if(event.key==='Enter')signIn()"></label><button class=wide onclick=signIn()>Sign in</button><button class="authlink wide" onclick="login('','forgot')">Forgot password?</button>`}
+${note?`<p class=m>${esc(note)}</p>`:''}${err?`<p class=e>${esc(err)}</p>`:''}<div style="margin-top:14px;text-align:center"><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div></div></div>`}
+function friendlyAuth(e){const c=e?.code||'',m={
+ 'auth/email-already-in-use':'An account already exists with this email. Use Sign in instead.',
+ 'auth/invalid-email':'Enter a valid email address.','auth/weak-password':'Use a password of at least 6 characters.',
+ 'auth/invalid-credential':'Incorrect email or password.','auth/user-not-found':'Incorrect email or password.',
+ 'auth/wrong-password':'Incorrect email or password.','auth/too-many-requests':'Too many attempts. Please wait and try again.'};return m[c]||e?.message||'Something went wrong.'}
+function signIn(){const em=$('#em')?.value.trim(),pw=$('#pw')?.value||'';if(!em||!pw)return login('Enter your email and password.','signin');auth.signInWithEmailAndPassword(em,pw).catch(e=>login(friendlyAuth(e),'signin'))}
+async function signUp(){const name=$('#nm')?.value.trim(),email=$('#em')?.value.trim().toLowerCase(),pw=$('#pw')?.value||'',pw2=$('#pw2')?.value||'';
+ if(name.length<2)return login('Enter your full name.','signup');if(!email)return login('Enter your email address.','signup');if(pw.length<6)return login('Password must be at least 6 characters.','signup');if(pw!==pw2)return login('The two passwords do not match.','signup');
+ signupBusy=true;let cred=null;try{cred=await auth.createUserWithEmailAndPassword(email,pw);try{await cred.user.updateProfile({displayName:name})}catch(_){}
+  const p={name,email,role:'instructor',approved:false,status:'pending',createdAt:ts()};await db.collection('instructors').doc(cred.user.uid).set(p);signupBusy=false;S.user=cred.user;await gateUser(cred.user)
+ }catch(e){signupBusy=false;if(cred){try{await auth.signOut()}catch(_){}}login(friendlyAuth(e),'signup')}}
+async function sendReset(){const email=$('#em')?.value.trim();if(!email)return login('Enter your email address.','forgot');try{await auth.sendPasswordResetEmail(email);login('','signin','Password reset email sent.')}catch(e){login(friendlyAuth(e),'forgot')}}
+function loadingAccount(){$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⋯</div><h2>Checking your LabTrack account</h2><p class=m>Please wait.</p></div></div>`}
+function pendingScreen(){stopLive();const p=S.profile||{};$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⏳</div><h2>Awaiting approval</h2><p><b>${esc(p.name||S.user?.displayName||'Instructor')}</b></p><p class=m>${esc(p.email||S.user?.email||'')}</p><p>Your LabTrack account was created successfully. An administrator must approve it before you can access student data.</p><div class=row style="justify-content:center"><button onclick=refreshAccess()>Check again</button><button class=g onclick="auth.signOut()">Sign out</button></div></div></div>`}
+function rejectedScreen(){stopLive();const p=S.profile||{};$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⛔</div><h2>Account not approved</h2><p><b>${esc(p.name||S.user?.displayName||'Instructor')}</b></p><p class=m>${esc(p.email||S.user?.email||'')}</p><p>This LabTrack account is currently rejected. Contact the LabTrack administrator if access should be restored.</p><button class=g onclick="auth.signOut()">Sign out</button></div></div>`}
+async function refreshAccess(){if(S.user)await gateUser(S.user)}
+async function gateUser(u){loadingAccount();const ref=db.collection('instructors').doc(u.uid);try{
+ let d=await ref.get(),p=d.exists?d.data():null;
+ if(!p){let cfg=null;try{cfg=await db.doc('cfg/main').get()}catch(_){}
+  const legacyAdmin=cfg?.exists&&(cfg.data().admins||[]).includes(u.uid);
+  p={name:u.displayName||u.email?.split('@')[0]||'Instructor',email:u.email||'',role:legacyAdmin?'admin':'instructor',approved:!!legacyAdmin,status:legacyAdmin?'approved':'pending',createdAt:ts()};await ref.set(p,{merge:true});d=await ref.get();p=d.data()
+ }
+ // Brand-new database only: the first LabTrack registrant becomes administrator.
+ if(!p.approved&&p.status!=='rejected')try{const c=await db.doc('cfg/main').get();if(!c.exists){await db.doc('cfg/main').set(defaultCfg(u.uid));await ref.set({approved:true,status:'approved',role:'admin',approvedAt:ts(),approvedBy:u.uid},{merge:true});d=await ref.get();p=d.data()}}catch(_){}
+ S.profile={id:u.uid,...p};watchOwnProfile(ref);
+ if(S.profile.approved===true&&S.profile.status==='approved')return start();
+ return S.profile.status==='rejected'?rejectedScreen():pendingScreen()
+ }catch(e){console.error(e);$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⚠</div><h2>Account check failed</h2><p class=e>${esc(friendlyAuth(e))}</p><p class=m>If you just upgraded LabTrack, publish the v10 Firestore security rules from the admin Settings page.</p><button class=g onclick="auth.signOut()">Sign out</button></div></div>`}}
+function watchOwnProfile(ref){stopProfileWatch();profileUnsub=ref.onSnapshot(d=>{if(!d.exists)return;const p={id:d.id,...d.data()},wasApproved=S.profile?.approved===true;S.profile=p;if(p.approved!==true||p.status!=='approved'){if(started)stopLive();return p.status==='rejected'?rejectedScreen():pendingScreen()}if(!started)start();else if(!wasApproved)render()},()=>{})}
+function watchInstructors(){if(S.admin&&!insUnsub){insUnsub=db.collection('instructors').onSnapshot(q=>{S.instructors=q.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==='ins')render()},e=>console.error(e))}else if(!S.admin&&insUnsub){try{insUnsub()}catch(_){}insUnsub=null;S.instructors=[];if(S.tab==='ins')S.tab='att'}}
 function start(){if(started)return;started=1;
- db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set({weeks:12,locked:{},items:DEF,admins:[S.user.uid],altLabLimit:2,absenceWarn:3});S.cfg=d.data();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});if(S.aw>S.cfg.weeks)S.aw=S.cfg.weeks;render()},e=>alert(e.message));
- db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));if(!S.labs.find(l=>l.id===S.lab))S.lab=S.labs[0]?.id||'';render()});
- db.collection('students').onSnapshot(q=>{S.studs=q.docs.map(d=>({_:d.id,...d.data()}));render()})}
+ unsubs.push(db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set(defaultCfg(S.user.uid));S.cfg=d.data();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});if(S.aw>S.cfg.weeks)S.aw=S.cfg.weeks;watchInstructors();render()},e=>{console.error(e);alert(e.message)}));
+ unsubs.push(db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));if(!S.labs.find(l=>l.id===S.lab))S.lab=S.labs[0]?.id||'';render()}));
+ unsubs.push(db.collection('students').onSnapshot(q=>{S.studs=q.docs.map(d=>({_:d.id,...d.data()}));render()}))}
 
 /* ---------- helpers ---------- */
 const LS=l=>S.studs.filter(s=>!l||s.lab===l).sort((a,b)=>String(a.sn).localeCompare(String(b.sn),undefined,{numeric:true})||String(a.nm).localeCompare(String(b.nm)));
@@ -94,10 +169,11 @@ function calc(s){const m={},it=S.cfg.items,g=s.g||{};
  it.forEach(i=>v(i.k));return m}
 
 /* ---------- main view ---------- */
-function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v9</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
-<nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
-<main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
+function render(){if(!S.cfg||!S.user||S.profile?.approved!==true)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
+ const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v10</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut()">Sign out</button></header>
+<nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
+<main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
 
 /* ---------- attendance ---------- */
@@ -150,7 +226,7 @@ function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab'
 function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
 
 /* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v9)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v10)</button><button class=g onclick=exGr()>Export simple grades</button></div>
 ${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10px;margin-top:10px"><span class=m>Focus grading:</span><select class=compact onchange="S.gfk=this.value">${inp.map(i=>`<option value="${i.k}" ${i.k===S.gfk?'selected':''}>${esc(i.n)}</option>`).join('')}</select><button onclick=startGradeFocus()>Start focus mode</button><span class=m>${S.gl?'Selected lab':'All students'}</span></div>`:''}
 <p class=m>Use ABS beside any score when a student was absent. ABS counts as 0 in calculated groups/sums; a blank score stays unentered.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
@@ -176,6 +252,17 @@ async function focusGradeAbs(){if(!FO)return;const s=focusStudent();if(!s)return
 async function focusGradeClear(){if(!FO)return;const s=focusStudent();if(!s)return;try{await St(s._).update({['g.'+FO.k]:FV()});renderFocus()}catch(e){alert(e.message)}}
 function renderFocusDone(){if(!FO)return;const t=FO.type==='att'?'Attendance focus complete':'Grading focus complete';$('#modal').innerHTML=`<div class=focusov><div class=focuspanel><div class=focusdone><div class=big>✓</div><h2>${t}</h2><p class=m>You reached the end of this student list.</p><div class=row style="justify-content:center"><button onclick="FO.i=0;renderFocus()">Start again</button><button class=g onclick=closeFocus()>Close</button></div></div></div></div>`}
 
+
+/* ---------- instructor management ---------- */
+const fmtWhen=t=>{try{return t?.toDate?t.toDate().toLocaleDateString():''}catch(_){return''}};
+function vIns(){if(!S.admin)return '<div class=card>Admin access required.</div>';const xs=S.instructors.slice().sort((a,b)=>{const o={pending:0,approved:1,rejected:2};return (o[a.status]??9)-(o[b.status]??9)||String(a.name||'').localeCompare(String(b.name||''))}),n=s=>xs.filter(x=>x.status===s).length;
+ return `<div class=card><h2>Instructor accounts</h2><p class=m>New instructors create their own LabTrack account. They cannot access attendance, grades, labs, or students until you approve them here.</p><div class=insgrid><div class=statbox><b>${n('pending')}</b>Pending</div><div class=statbox><b>${n('approved')}</b>Approved</div><div class=statbox><b>${n('rejected')}</b>Rejected</div></div></div>
+<div class=card style="padding:0"><div class=instructorrow style="font-size:12px;font-weight:700;background:#e8ecf3"><div>Instructor</div><div>Email</div><div>Status</div><div>Action</div></div>${xs.map(p=>{const self=p.id===S.user.uid,st=p.status||'pending';return `<div class=instructorrow><div class=who><b>${esc(p.name||'Unnamed instructor')}</b><span class=m>${p.role==='admin'?'Administrator':'Instructor'}${fmtWhen(p.createdAt)?' · joined '+esc(fmtWhen(p.createdAt)):''}</span></div><div>${esc(p.email||'')}</div><div><span class="badge status ${esc(st)}">${esc(st)}</span></div><div>${self?'<span class=m>This is you</span>':st==='pending'?`<button onclick="approveInstructor('${p.id}')">Approve</button> <button class=d onclick="rejectInstructor('${p.id}')">Reject</button>`:st==='approved'?`<button class=d onclick="rejectInstructor('${p.id}')">Revoke access</button>`:`<button onclick="approveInstructor('${p.id}')">Approve</button> <button class=g onclick="pendingInstructor('${p.id}')">Set pending</button>`}</div></div>`}).join('')||'<div style="padding:16px" class=m>No instructor profiles yet.</div>'}</div>`}
+async function approveInstructor(uid){if(!S.admin)return;try{await db.collection('instructors').doc(uid).set({approved:true,status:'approved',role:'instructor',approvedAt:ts(),approvedBy:S.user.uid},{merge:true})}catch(e){alert(e.message)}}
+async function rejectInstructor(uid){if(!S.admin||uid===S.user.uid)return;if(!confirm('Remove this instructor\'s LabTrack access? Their account will remain stored and can be approved again later.'))return;try{await db.collection('instructors').doc(uid).set({approved:false,status:'rejected',rejectedAt:ts(),rejectedBy:S.user.uid},{merge:true})}catch(e){alert(e.message)}}
+async function pendingInstructor(uid){if(!S.admin||uid===S.user.uid)return;try{await db.collection('instructors').doc(uid).set({approved:false,status:'pending'},{merge:true})}catch(e){alert(e.message)}}
+function securityCard(){return S.admin?`<div class=card><h3>Firebase security rules <span class="badge blue">Required once</span></h3><p class=m>These rules make Pending and Rejected accounts unable to read student data even if someone bypasses the LabTrack interface. Publish them once in Firebase Console → Firestore Database → Rules.</p><pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy secure rules</button></div>`:''}
+
 /* ---------- settings ---------- */
 function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
  const desc=i=>i.t=='att'?(i.mode=='pen'?`max minus ${i.pen} per absence`:'attended / weeks x max'):i.t=='grp'?`${i.agg=='avg'?'average':'sum'} of ${i.top?'highest '+i.top+' of ':''}${(i.src||[]).map(nm).join(', ')}${i.mul!=1?' x '+i.mul:''}`:i.t=='sum'?(i.src||[]).map(nm).join(' + '):'';
@@ -186,7 +273,7 @@ function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Su
 <label>Absence warning threshold <span class=m>(warning appears after the student exceeds this number)</span><input type=number min=0 max=30 value="${c.absenceWarn??3}" onchange="Cf().set({absenceWarn:Math.max(0,+this.value||0)},{merge:true})"></label></div>
 <div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
 ${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
-<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>${tplCards(c)}`}
+<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>${tplCards(c)}${securityCard()}`}
 function editItem(k,t){const i=k?{...S.cfg.items.find(x=>x.k===k)}:{k:'c'+Date.now(),t,n:'',max:10,src:[],top:0,agg:'avg',mul:1,mode:'ratio',pen:1},o=S.cfg.items.filter(x=>x.k!==i.k),sel=(a,b)=>a==b?'selected':'';
  $('#modal').innerHTML=`<div class=ov><div class=card><h3>${k?'Edit':'New'} item</h3>
 <label>Name<input id=m_n value="${esc(i.n)}"></label><label>Max grade<input id=m_max type=number step=any value="${i.max}"></label>
@@ -216,7 +303,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v9.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v10.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
@@ -233,7 +320,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   // Microsoft Excel is much stricter than Google Sheets about the Shared String Table.
   // Earlier LabTrack builds changed many template cells from shared strings to inlineStr
   // while leaving the template's sharedStrings metadata unchanged. Google Sheets repairs
-  // that silently, but Excel can reject the package. V9 keeps Excel-style shared strings.
+  // that silently, but Excel can reject the package. V10 keeps Excel-style shared strings.
   const sstPath='xl/sharedStrings.xml',sstFile=zip.file(sstPath);
   if(!sstFile)throw new Error('Template is missing xl/sharedStrings.xml');
   let sstXml=await sstFile.async('string');
@@ -297,7 +384,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
   zip.file(P+'1.xml',xml);
 
-  // Update only the COUNTIF/COUNTIFS ranges in the statistic sheets. V9 deliberately
+  // Update only the COUNTIF/COUNTIFS ranges in the statistic sheets. V10 deliberately
   // keeps Excel's cached formula results and calcChain intact; the formula cells are
   // the same cells as in the template and Excel can recalculate them on open.
   for(let k=2;k<=5;k++){
@@ -309,7 +396,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
 
   // Append any new strings to the template's Shared String Table. count/uniqueCount are
   // optional OOXML attributes, so remove them instead of leaving stale values after the
-  // roster was shortened/changed. This is the key Excel-compatibility repair in V9.
+  // roster was shortened/changed. This is the key Excel-compatibility repair in V10.
   if(addedStrings.length){
    const extra=addedStrings.map(v=>'<si><t xml:space="preserve">'+xe(v)+'</t></si>').join('');
    sstXml=sstXml.replace(/<\/sst>\s*$/,extra+'</sst>');
@@ -325,7 +412,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
 
   const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6},platform:'DOS'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('LabTrack v9 — Excel export failed safely: '+e.message)}
+ }catch(e){console.error(e);alert('LabTrack v10 — Excel export failed safely: '+e.message)}
 }
 boot();
 </script></body></html>
