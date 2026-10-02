@@ -189,8 +189,9 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
  const mc=ss.map(calc),val=(s,k,x)=>{const g=(s.g||{})[k],i=it(k);return i.t=='in'&&typeof g=='string'&&g!==''?g:x[k]};
  cells.forEach(e=>{const r=e.getAttribute('r'),[,col,rw]=r.match(/^([A-Z]+)(\d+)$/),n=+rw;
   if(r in H)return put(e,H[r]);if(n<5||n>713)return;
+  const i=n-5,s=ss[i],x=mc[i];if(!s&&['G','I','J','K','L'].includes(col))return put(e);
   if(col=='J'||col=='K')return put(e,null,f5[col].replace(/\b([A-Z]{1,2})5(?!\d)/g,'$1'+n));
-  const i=n-5,s=ss[i],x=mc[i],V={A:s&&(s.sn===''||isNaN(+s.sn)?i+1:+s.sn),B:s&&s.sid,C:s&&s.nm,D:s&&val(s,m.mid,x),E:s&&val(s,m.cw,x),F:s&&val(s,m.pr,x),H:s&&val(s,m.fin,x),M:s&&s.st&&s.st!=SL[0]?s.st:''};
+  const V={A:s&&(s.sn===''||isNaN(+s.sn)?i+1:+s.sn),B:s&&s.sid,C:s&&s.nm,D:s&&val(s,m.mid,x),E:s&&val(s,m.cw,x),F:s&&val(s,m.pr,x),H:s&&val(s,m.fin,x),M:s&&s.st&&s.st!=SL[0]?s.st:''};
   if(col in V)put(e,V[col])});
  zip.file(P+'1.xml',sc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(d)));
  for(let k=2;k<=5;k++)zip.file(P+k+'.xml',sc(await rd(P+k+'.xml')));
