@@ -80,7 +80,7 @@ function calc(s){const m={},it=S.cfg.items,g=s.g||{};
 
 /* ---------- main view ---------- */
 function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v5</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v6</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
 <nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
 <main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
@@ -129,7 +129,7 @@ function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map
 
 /* ---------- grades ---------- */
 function vGr(){const it=S.cfg.items;
- return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v5 template)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+ return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v6 dynamic ranges)</button><button class=g onclick=exGr()>Export simple grades</button></div>
 <p class=m>Shaded columns are calculated. Blank scores are ignored in groups and count as 0 in sums.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
 ${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input data-f="${s._}_${i.k}" inputmode=decimal value="${esc((s.g||{})[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
@@ -172,7 +172,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v5.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v6.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
@@ -220,6 +220,22 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
    return row;
   });
 
+  // Every COUNTIF/COUNTIFS data range now ends at the last exported student.
+  // Student data always starts on row 5. This also normalizes old template ranges
+  // that accidentally began on row 3 or 4. Single-cell references such as H4/G4
+  // (maximum marks) are intentionally left unchanged.
+  const lastDataRow=Math.max(5,4+ss.length);
+  const dynamicCountifRanges=(sheetXml,allowLocal)=>sheetXml.replace(/<f\b([^>]*)>([\s\S]*?)<\/f>/g,(whole,attrs,formula)=>{
+   if(!/\bCOUNTIFS?\s*\(/i.test(formula))return whole;
+   const changed=formula.replace(/((?:'Program_Course Code'!)?)(\$?)([A-Z]{1,3})(\$?)\d+:(\$?)([A-Z]{1,3})(\$?)\d+/g,(ref,prefix,a1,c1,r1,a2,c2,r2)=>{
+    if(c1!==c2)return ref;
+    if(!prefix&&!allowLocal)return ref;
+    return prefix+a1+c1+r1+'5:'+a2+c2+r2+lastDataRow;
+   });
+   return '<f'+attrs+'>'+changed+'</f>';
+  });
+  xml=dynamicCountifRanges(xml,true);
+
   const formulaCountAfter=(xml.match(/<f\b/g)||[]).length,rowCountAfter=(xml.match(/<row\b/g)||[]).length;
   if(formulaCountAfter!==formulaCountBefore)throw new Error('Formula integrity check failed. No Excel file was created.');
   if(rowCountAfter!==rowCountBefore)throw new Error('Worksheet row integrity check failed. No Excel file was created.');
@@ -227,17 +243,29 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
   zip.file(P+'1.xml',xml);
 
-  // Keep every formula, calcChain entry, chart, style, relationship and supporting sheet intact.
+  // Apply the same dynamic COUNTIF/COUNTIFS ranges to all four statistics sheets.
+  // Their formulas continue to point at Program_Course Code, but only through the
+  // final populated student row instead of the template's fixed row 713.
+  for(let k=2;k<=5;k++){
+   const path=P+k+'.xml',sx=dynamicCountifRanges(await rd(path),false);
+   const parsed=new DOMParser().parseFromString(sx,'application/xml');
+   if(parsed.getElementsByTagName('parsererror').length)throw new Error('Statistics sheet '+k+' became invalid. No Excel file was created.');
+   zip.file(path,sx);
+  }
+
+  // Keep every formula, calcChain entry, chart, style and relationship intact.
   // Only request a fresh calculation when Excel/Google Sheets opens the workbook.
   const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);
   if(wbFile){let wx=await wbFile.async('string');
+   // Keep the worksheet filter bounded to the actual exported student rows too.
+   wx=wx.replace(/(<definedName\b[^>]*name="_xlnm\._FilterDatabase"[^>]*>\s*'Program_Course Code'!\$I\$1:\$I\$)\d+(<\/definedName>)/,(_,a,b)=>a+lastDataRow+b);
    if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');
    zip.file(wbPath,wx);
   }
 
   const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('LabTrack v5 — Excel export failed safely: '+e.message)}
+ }catch(e){console.error(e);alert('LabTrack v6 — Excel export failed safely: '+e.message)}
 }
 boot();
 </script></body></html>
