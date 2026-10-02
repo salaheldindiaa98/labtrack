@@ -31,6 +31,7 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
+const APP_VERSION='5.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
@@ -79,7 +80,7 @@ function calc(s){const m={},it=S.cfg.items,g=s.g||{};
 
 /* ---------- main view ---------- */
 function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack</b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v5</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
 <nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
 <main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
@@ -128,7 +129,7 @@ function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map
 
 /* ---------- grades ---------- */
 function vGr(){const it=S.cfg.items;
- return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (template)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+ return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v5 template)</button><button class=g onclick=exGr()>Export simple grades</button></div>
 <p class=m>Shaded columns are calculated. Blank scores are ignored in groups and count as 0 in sums.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
 ${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input data-f="${s._}_${i.k}" inputmode=decimal value="${esc((s.g||{})[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
@@ -171,7 +172,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v5.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
@@ -236,7 +237,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
 
   const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('Excel export failed safely: '+e.message)}
+ }catch(e){console.error(e);alert('LabTrack v5 — Excel export failed safely: '+e.message)}
 }
 boot();
 </script></body></html>
