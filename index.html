@@ -177,7 +177,7 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
  const t=await db.doc('cfg/template').get();if(!t.exists)return alert('Upload the template in Settings first.');
  const zip=await JSZip.loadAsync(t.data().b64,{base64:true}),P='xl/worksheets/sheet',rd=f=>zip.file(f).async('string');
- const sc=x=>x.replace(/<c\b([^>]*)>(<f\b[^>]*\/>|<f\b[^>]*>[^<]*<\/f>)(<v>[^<]*<\/v>)?<\/c>/g,(a,b,f)=>`<c${b.replace(/\st="[^"]*"/,'')}>${f}</c>`);
+ // Only edit the grading worksheet. Supporting sheets must stay untouched because Google Sheets may rely on their cached formula values.
  const d=new DOMParser().parseFromString(await rd(P+'1.xml'),'application/xml'),NS=d.documentElement.namespaceURI,cells=[...d.getElementsByTagName('c')];
  const mk=(n,x)=>{const e=d.createElementNS(NS,n);if(x!=null)e.textContent=x;return e};
  const put=(e,v,f)=>{[...e.childNodes].forEach(n=>e.removeChild(n));e.removeAttribute('t');if(f)return void e.appendChild(mk('f',f));
@@ -193,12 +193,28 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   if(col=='J'||col=='K')return put(e,null,f5[col].replace(/\b([A-Z]{1,2})5(?!\d)/g,'$1'+n));
   const V={A:s&&(s.sn===''||isNaN(+s.sn)?i+1:+s.sn),B:s&&s.sid,C:s&&s.nm,D:s&&val(s,m.mid,x),E:s&&val(s,m.cw,x),F:s&&val(s,m.pr,x),H:s&&val(s,m.fin,x),M:s&&s.st&&s.st!=SL[0]?s.st:''};
   if(col in V)put(e,V[col])});
- zip.file(P+'1.xml',sc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(d)));
- for(let k=2;k<=5;k++)zip.file(P+k+'.xml',sc(await rd(P+k+'.xml')));
- zip.file('xl/workbook.xml',(await rd('xl/workbook.xml')).replace(/<calcPr[^>]*\/>/,'<calcPr calcId="162913" fullCalcOnLoad="1"/>'));
- zip.remove('xl/calcChain.xml');
- for(const f of['[Content_Types].xml','xl/_rels/workbook.xml.rels'])zip.file(f,(await rd(f)).replace(/<(Override|Relationship)\b[^>]*calcChain[^>]*\/>/g,''));
- const b=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
- a.href=URL.createObjectURL(b);a.download=(cr.code||'Course')+'_Course_Grading.xlsx';a.click()}
+ // Clear cached values only for formulas on the grading sheet so changed grades recalculate.
+ cells.forEach(e=>{if(e.getElementsByTagName('f').length){[...e.childNodes].filter(n=>n.nodeType===1&&n.localName==='v').forEach(n=>e.removeChild(n))}});
+ zip.file(P+'1.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(d));
+
+ // Request recalculation without rewriting any support/lookup worksheets.
+ let wx=await rd('xl/workbook.xml'),cp='<calcPr calcMode="auto" calcId="162913" fullCalcOnLoad="1" forceFullCalc="1"/>';
+ if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b[^>]*\/>/,cp);
+ else if(/<calcPr\b[^>]*>[\s\S]*?<\/calcPr>/.test(wx))wx=wx.replace(/<calcPr\b[^>]*>[\s\S]*?<\/calcPr>/,cp);
+ else wx=wx.replace(/<\/workbook>/,cp+'</workbook>');
+ zip.file('xl/workbook.xml',wx);
+
+ // calcChain is optional; remove it and its references cleanly so Excel rebuilds it.
+ if(zip.file('xl/calcChain.xml'))zip.remove('xl/calcChain.xml');
+ let x=await rd('[Content_Types].xml');
+ x=x.replace(/<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi,'');
+ zip.file('[Content_Types].xml',x);
+ x=await rd('xl/_rels/workbook.xml.rels');
+ x=x.replace(/<Relationship\b[^>]*Target="(?:\.\/)?calcChain\.xml"[^>]*\/>/gi,'');
+ zip.file('xl/_rels/workbook.xml.rels',x);
+
+ // Build the file as bytes first. This is more reliable on mobile browsers.
+ const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
+ const url=URL.createObjectURL(b);a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 boot();
 </script></body></html>
