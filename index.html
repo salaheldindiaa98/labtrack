@@ -21,6 +21,16 @@ th{background:#e8ecf3;font-size:12px}td.n,th.n{text-align:left;position:sticky;l
 td input{width:64px;padding:5px;text-align:center}td.k{background:#eef1f7}
 .s{width:36px;height:34px;padding:0;background:#e3e8f0;color:var(--t);font-size:16px}.s.P{background:#d1fadf;color:var(--g)}.s.A{background:#fee4e2;color:var(--r)}.s.X{background:#dbeafe;color:#1d4ed8}
 .scorebox{display:flex;gap:4px;align-items:center;justify-content:center}.scorebox input{width:62px}.absbtn{padding:5px 6px;border:1px solid var(--b);background:#fff;color:var(--m);font-size:11px}.absbtn.on{background:#fee4e2;color:var(--r);border-color:#f3b4ae;font-weight:700}.badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 8px;background:#eef1f7;color:var(--m);font-size:12px}.badge.blue{background:#dbeafe;color:#1d4ed8}.badge.warn{background:#fff3cd;color:#8a5b00}.warnbtn{padding:4px 7px;background:#fff3cd;color:#8a5b00;border:1px solid #f1d58a;font-size:12px}.weekdate{display:block;font-size:10px;color:var(--m);font-weight:400;margin-top:2px}.visitlist{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:8px;margin-top:8px}.visititem{display:flex;gap:8px;align-items:center;padding:4px 0}.visititem span{flex:1}.policy{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.flagname{box-shadow:inset 4px 0 #f59e0b}.compact{max-width:150px}
+.focusov{position:fixed;inset:0;background:var(--bg);z-index:30;overflow:auto}
+.focuspanel{min-height:100%;max-width:860px;margin:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.focushead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.focushead .grow{flex:1}.focushead h2{margin:0}.focushead .m{display:block;margin-top:2px}
+.focusprogress{height:8px;background:#dfe4ec;border-radius:999px;overflow:hidden}.focusprogress>span{display:block;height:100%;background:var(--p);transition:width .18s ease}
+.focuscard{background:var(--c);border:1px solid var(--b);border-radius:18px;padding:clamp(20px,5vw,42px);box-shadow:0 12px 30px #14213d18;text-align:center;margin:auto 0}
+.focusserial{font-size:14px;color:var(--m);margin-bottom:8px}.focusid{font-size:clamp(28px,8vw,62px);font-weight:800;letter-spacing:.02em;line-height:1.05;word-break:break-word}.focusname{font-size:clamp(24px,6vw,44px);font-weight:700;line-height:1.12;margin-top:14px}.focusmeta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}.focusstatus{margin:18px auto 0;font-weight:700;min-height:22px}
+.focusactions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}.focusactions button{min-height:82px;font-size:clamp(19px,4vw,26px);font-weight:700}.focusactions .present{background:var(--g)}.focusactions .absent{background:var(--r)}
+.focusgrade{max-width:420px;margin:22px auto 0}.focusgrade input{width:100%;font-size:clamp(34px,9vw,58px);font-weight:700;text-align:center;padding:16px;border-width:2px}.focusgrade .max{font-size:16px;color:var(--m);margin-top:6px}.focusgradeactions{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:12px}.focusgradeactions button{min-height:58px;font-size:18px;font-weight:700}.focusgradeactions .absent{background:var(--r)}
+.focusnav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px}.focusnav button{min-width:110px}.focusdone{padding:40px 12px;text-align:center}.focusdone .big{font-size:54px}.focusdone h2{font-size:32px;margin:8px 0}
+@media(max-width:520px){.focuspanel{padding:10px}.focuscard{border-radius:14px}.focusactions{grid-template-columns:1fr}.focusactions button{min-height:72px}.focusgradeactions{grid-template-columns:1fr}.focushead button{padding:8px 10px}}
 .ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}.ov .card{width:100%;max-width:420px;max-height:90vh;overflow:auto;margin:0}
 pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
 .e{color:var(--r)}.m{color:var(--m);font-size:13px}
@@ -32,11 +42,11 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-const APP_VERSION='7.0';
+const APP_VERSION='8.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
-let S={tab:'att',lab:'',gl:'',aw:1,admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started;
+let S={tab:'att',lab:'',gl:'',aw:1,gfk:'',admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started,FO=null;
 
 /* ---------- start-up, setup, login ---------- */
 const CFG={apiKey:"AIzaSyAxgPrBcVszBieseQXfaz5JqcO_UAAopg0",authDomain:"labtrack-c55fb.firebaseapp.com",projectId:"labtrack-c55fb",storageBucket:"labtrack-c55fb.firebasestorage.app",messagingSenderId:"561200653207",appId:"1:561200653207:web:e7cb27d82c1b97e3575ad2"};
@@ -85,7 +95,7 @@ function calc(s){const m={},it=S.cfg.items,g=s.g||{};
 
 /* ---------- main view ---------- */
 function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v7</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v8</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
 <nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
 <main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
@@ -99,6 +109,7 @@ function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(
  return top+`<div class=row><label>Place<input data-f=lp value="${esc(l.place)}" onchange="db.doc('labs/${l.id}').update({place:this.value})"></label>
 <label>Session week<select class=compact onchange="S.aw=+this.value;render()">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label>
 <label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>
+<button class=g onclick=startAttendanceFocus() ${S.cfg.locked?.[S.aw]&&!S.admin?'disabled':''}>Focus mode</button>
 <button onclick=visitorModal() ${S.cfg.locked?.[S.aw]&&!S.admin?'disabled':''}>+ Visiting student</button>
 ${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div>
 <div class=policy><span class="badge blue">Other-lab allowance: ${lim}</span><span class=badge>Warning after &gt; ${thr} absences</span></div>
@@ -139,12 +150,31 @@ function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab'
 function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
 
 /* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items;return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v7)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v8)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10px;margin-top:10px"><span class=m>Focus grading:</span><select class=compact onchange="S.gfk=this.value">${inp.map(i=>`<option value="${i.k}" ${i.k===S.gfk?'selected':''}>${esc(i.n)}</option>`).join('')}</select><button onclick=startGradeFocus()>Start focus mode</button><span class=m>${S.gl?'Selected lab':'All students'}</span></div>`:''}
 <p class=m>Use ABS beside any score when a student was absent. ABS counts as 0 in calculated groups/sums; a blank score stays unentered.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
 ${LS(S.gl).map(s=>{const m=calc(s),g=s.g||{};return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><div class=scorebox><input data-f="${s._}_${i.k}" inputmode=decimal ${g[i.k]==='Abs'?'disabled':''} value="${g[i.k]==='Abs'?'':esc(g[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)"><button class="absbtn ${g[i.k]==='Abs'?'on':''}" title="Mark absent" onclick="toggleScoreAbs('${s._}','${i.k}')">ABS</button></div>`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
 function setG(id,k,v){v=v.trim();const n=+v;St(id).update({['g.'+k]:v===''?FV():isNaN(n)?v:n})}
 function toggleScoreAbs(id,k){const s=S.studs.find(x=>x._===id),on=(s?.g||{})[k]==='Abs';St(id).update({['g.'+k]:on?FV():'Abs'})}
+
+/* ---------- focus modes ---------- */
+function focusList(scope){if(scope)return LS(scope);return [...S.studs].sort((a,b)=>String(labName(a.lab)).localeCompare(String(labName(b.lab)),undefined,{numeric:true})||String(a.sn).localeCompare(String(b.sn),undefined,{numeric:true})||String(a.nm).localeCompare(String(b.nm)))}
+function startAttendanceFocus(){if(!S.lab)return alert('Choose a lab first.');if(S.cfg.locked?.[S.aw]&&!S.admin)return alert('This week is locked.');const xs=LS(S.lab);if(!xs.length)return alert('There are no students in this lab.');FO={type:'att',ids:xs.map(s=>s._),i:0,w:S.aw,lab:S.lab};renderFocus()}
+function startGradeFocus(){const item=S.cfg.items.find(i=>i.k===S.gfk&&i.t==='in');if(!item)return alert('Choose a score first.');const xs=focusList(S.gl);if(!xs.length)return alert('There are no students in this selection.');FO={type:'gr',ids:xs.map(s=>s._),i:0,k:item.k,scope:S.gl};renderFocus()}
+function closeFocus(){FO=null;$('#modal').innerHTML=''}
+function focusStudent(){if(!FO)return null;let s=S.studs.find(x=>x._===FO.ids[FO.i]);if(s)return s;for(let j=FO.i+1;j<FO.ids.length;j++){s=S.studs.find(x=>x._===FO.ids[j]);if(s){FO.i=j;return s}}return null}
+function focusStep(d){if(!FO)return;FO.i+=d;if(FO.i<0)FO.i=0;if(FO.i>=FO.ids.length)return renderFocusDone();renderFocus()}
+function focusPct(){return !FO||!FO.ids.length?0:Math.round(((FO.i+1)/FO.ids.length)*100)}
+function focusBase(s,subtitle,body){const total=FO.ids.length,n=Math.min(FO.i+1,total);$('#modal').innerHTML=`<div class=focusov><div class=focuspanel><div class=focushead><div class=grow><h2>Focus mode</h2><span class=m>${esc(subtitle)}</span></div><span class=badge>${n} / ${total}</span><button class=g onclick=closeFocus()>Exit</button></div><div class=focusprogress><span style="width:${focusPct()}%"></span></div>${body}</div></div>`}
+function renderFocus(){if(!FO)return;const s=focusStudent();if(!s)return renderFocusDone();if(FO.type==='att')return renderAttendanceFocus(s);renderGradeFocus(s)}
+function renderAttendanceFocus(s){const l=S.labs.find(x=>x.id===FO.lab),w=FO.w,v=(s.att||{})[w]||'',status=v==='P'?'Attended':v==='A'?'Absent':v==='X'?'Attended in '+labName((s.alt||{})[w]):'Not marked';const cls=v==='P'?'blue':v==='A'?'warn':v==='X'?'blue':'';focusBase(s,`${l?.name||'Lab'} · Week ${w}${(l?.dates||{})[w]?' · '+shortDate((l.dates||{})[w]):''}`,`<div class=focuscard><div class=focusserial>Serial ${esc(s.sn||'—')}</div><div class=focusid>${esc(s.sid||'No ID')}</div><div class=focusname>${esc(s.nm||'Unnamed student')}</div><div class=focusmeta><span class=badge>${esc(labName(s.lab))}</span><span class="badge ${cls}">${esc(status)}</span><span class=badge>Other lab ${altN(s)}/${Math.max(0,+S.cfg.altLabLimit||0)}</span></div><div class=focusactions><button class=present onclick="focusAttendanceSave('P')">✓ Attended</button><button class=absent onclick="focusAttendanceSave('A')">✕ Absent</button></div><div class=focusnav><button class=g onclick="focusStep(-1)" ${FO.i===0?'disabled':''}>Previous</button><button class=g onclick="focusStep(1)">Skip / Next</button></div></div>`)}
+async function focusAttendanceSave(v){if(!FO)return;if(S.cfg.locked?.[FO.w]&&!S.admin)return alert('This week is locked.');const s=focusStudent();if(!s)return;try{await St(s._).update({['att.'+FO.w]:v,['alt.'+FO.w]:FV()});focusStep(1)}catch(e){alert(e.message)}}
+function renderGradeFocus(s){const item=S.cfg.items.find(i=>i.k===FO.k),g=(s.g||{})[FO.k],isAbs=g==='Abs',val=isAbs?'':(g??'');focusBase(s,`${item?.n||'Score'} · ${FO.scope?labName(FO.scope):'All students'}`,`<div class=focuscard><div class=focusserial>Serial ${esc(s.sn||'—')} · ${esc(labName(s.lab))}</div><div class=focusid>${esc(s.sid||'No ID')}</div><div class=focusname>${esc(s.nm||'Unnamed student')}</div><div class=focusmeta>${isAbs?'<span class="badge warn">Current: ABS</span>':val!==''?`<span class="badge blue">Current: ${esc(val)} / ${esc(item?.max??'')}</span>`:'<span class=badge>Not graded</span>'}</div><div class=focusgrade><input id=fg inputmode=decimal type=number step=any min=0 ${item?.max>0?`max="${item.max}"`:''} value="${esc(val)}" placeholder="Grade" onkeydown="if(event.key==='Enter'){event.preventDefault();focusGradeSave()}"><div class=max>${item?.max?`Maximum grade: ${esc(item.max)}`:'Enter grade'} · press Enter for Save & Next</div><div class=focusgradeactions><button onclick=focusGradeSave()>Save & Next</button><button class=absent onclick=focusGradeAbs()>ABS & Next</button></div></div><div class=focusnav><button class=g onclick="focusStep(-1)" ${FO.i===0?'disabled':''}>Previous</button><button class=g onclick="focusStep(1)">Skip / Next</button><button class=g onclick=focusGradeClear()>Clear score</button></div></div>`);setTimeout(()=>$('#fg')?.focus(),0)}
+async function focusGradeSave(){if(!FO)return;const s=focusStudent(),item=S.cfg.items.find(i=>i.k===FO.k),raw=$('#fg')?.value.trim()??'';if(!s||!item)return;if(raw==='')return alert('Enter a grade, choose ABS, or use Skip / Next.');const n=+raw;if(Number.isNaN(n))return alert('Enter a numeric grade.');if(n<0)return alert('Grade cannot be below 0.');if(item.max>0&&n>+item.max)return alert(`Grade cannot exceed ${item.max}.`);try{await St(s._).update({['g.'+FO.k]:n});focusStep(1)}catch(e){alert(e.message)}}
+async function focusGradeAbs(){if(!FO)return;const s=focusStudent();if(!s)return;try{await St(s._).update({['g.'+FO.k]:'Abs'});focusStep(1)}catch(e){alert(e.message)}}
+async function focusGradeClear(){if(!FO)return;const s=focusStudent();if(!s)return;try{await St(s._).update({['g.'+FO.k]:FV()});renderFocus()}catch(e){alert(e.message)}}
+function renderFocusDone(){if(!FO)return;const t=FO.type==='att'?'Attendance focus complete':'Grading focus complete';$('#modal').innerHTML=`<div class=focusov><div class=focuspanel><div class=focusdone><div class=big>✓</div><h2>${t}</h2><p class=m>You reached the end of this student list.</p><div class=row style="justify-content:center"><button onclick="FO.i=0;renderFocus()">Start again</button><button class=g onclick=closeFocus()>Close</button></div></div></div></div>`}
 
 /* ---------- settings ---------- */
 function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
@@ -186,7 +216,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v7.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v8.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
