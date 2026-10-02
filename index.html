@@ -179,64 +179,62 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
  try{
   const zip=await JSZip.loadAsync(t.data().b64,{base64:true}),P='xl/worksheets/sheet',rd=f=>{const z=zip.file(f);if(!z)throw new Error('Template is missing '+f);return z.async('string')};
   let xml=await rd(P+'1.xml');
+  const formulaCountBefore=(xml.match(/<f\b/g)||[]).length,rowCountBefore=(xml.match(/<row\b/g)||[]).length;
 
-  // IMPORTANT: patch the original worksheet XML in place. Do not parse/re-serialize the
-  // whole sheet and do not touch support sheets such as Program_Course Code.
   const xr=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const xe=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const colNo=c=>{let n=0;for(const ch of c)n=n*26+ch.charCodeAt(0)-64;return n};
-  const cellRe=ref=>new RegExp('<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)>([\\s\\S]*?)<\\/c>|<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)\\s*\\/>');
   const cleanAttrs=a=>(' '+String(a||'').trim()).replace(/\s+t="[^"]*"/g,'').replace(/^\s*/,' ');
-  const make=(ref,attrs,v,kind='auto')=>{attrs=cleanAttrs(attrs||('r="'+ref+'"'));
-   if(!/\br="[^"]+"/.test(attrs))attrs+=' r="'+ref+'"';
+  const make=(ref,attrs,v,kind='auto')=>{attrs=cleanAttrs(attrs||('r="'+ref+'"'));if(!/\br="[^"]+"/.test(attrs))attrs+=' r="'+ref+'"';
    if(v===''||v==null)return '<c'+attrs+'></c>';
    if(kind==='text')return '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xe(v)+'</t></is></c>';
    const n=typeof v==='number'?v:(typeof v==='string'&&/^-?\d+(?:\.\d+)?$/.test(v.trim())?+v:NaN);
    if(kind==='number'||!Number.isNaN(n))return '<c'+attrs+'><v>'+String(kind==='number'?+v:n)+'</v></c>';
    return '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xe(v)+'</t></is></c>'};
-  const put=(ref,v,kind='auto')=>{const re=cellRe(ref),hit=xml.match(re);if(hit){xml=xml.replace(re,make(ref,hit[1]||hit[3],v,kind));return}
-   // If a formatted cell is unexpectedly absent, insert it into the correct row in column order.
-   const mm=ref.match(/^([A-Z]+)(\d+)$/),targetCol=colNo(mm[1]),row=mm[2],rr=new RegExp('(<row\\b[^>]*\\br="'+row+'"[^>]*>)([\\s\\S]*?)(<\\/row>)');
-   if(!rr.test(xml))throw new Error('Template row '+row+' is missing.');
-   xml=xml.replace(rr,(all,open,body,close)=>{const nc=make(ref,'r="'+ref+'"',v,kind),cre=/<c\b[^>]*\br="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g;let mt,pos=-1;
-    while((mt=cre.exec(body))){if(colNo(mt[1])>targetCol){pos=mt.index;break}}return open+(pos<0?body+nc:body.slice(0,pos)+nc+body.slice(pos))+close});
+  const patchCell=(row,ref,v,kind='auto')=>{
+   // Self-closing cells MUST be matched first. Matching the normal-cell branch first can
+   // swallow the following cells and silently corrupt the worksheet.
+   const re=new RegExp('<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)\\s*\\/>|<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)>([\\s\\S]*?)<\\/c>');
+   const hit=row.match(re);if(!hit)throw new Error('Template cell '+ref+' is missing.');
+   return row.replace(re,make(ref,hit[1]||hit[2],v,kind));
   };
 
-  const mx=k=>+it(m[k]).max||0,G=mx('mid')+mx('cw')+mx('pr');
-  const H={B1:[cr.univ,'text'],D1:[cr.prog,'text'],O1:[cr.sem,'text'],E2:[cr.code,'text'],H2:[cr.name,'text'],M2:[cr.ch,'text'],O2:[cr.inst,'text'],D4:[mx('mid'),'number'],E4:[mx('cw'),'number'],F4:[mx('pr'),'number'],G4:[G,'number'],H4:[mx('fin'),'number'],I4:[G+mx('fin'),'number']};
-  Object.entries(H).forEach(([r,[v,k]])=>put(r,v,k));
+  const mx=k=>+it(m[k]).max||0,G=mx('mid')+mx('cw')+mx('pr'),mc=ss.map(calc);
+  const val=(s,k,x)=>{const g=(s.g||{})[k],i=it(k);return i.t=='in'&&typeof g=='string'&&g!==''?g:x[k]};
+  const heads={
+   1:[['B1',cr.univ,'text'],['D1',cr.prog,'text'],['O1',cr.sem,'text']],
+   2:[['E2',cr.code,'text'],['H2',cr.name,'text'],['M2',cr.ch,'auto'],['O2',cr.inst,'text']],
+   4:[['D4',mx('mid'),'number'],['E4',mx('cw'),'number'],['F4',mx('pr'),'number'],['G4',G,'number'],['H4',mx('fin'),'number'],['I4',G+mx('fin'),'number']]
+  };
 
-  const mc=ss.map(calc),val=(s,k,x)=>{const g=(s.g||{})[k],i=it(k);return i.t=='in'&&typeof g=='string'&&g!==''?g:x[k]};
-  for(let n=5;n<=713;n++){
+  xml=xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,rn)=>{
+   const n=+rn;if(heads[n]){for(const [ref,v,k] of heads[n])row=patchCell(row,ref,v,k);return row}
+   if(n<5||n>713)return row;
    const i=n-5,s=ss[i],x=mc[i];
    if(s){
-    put('A'+n,s.sn===''||isNaN(+s.sn)?i+1:+s.sn,'auto');
-    put('B'+n,s.sid??'','text');
-    put('C'+n,s.nm??'','text');
-    put('D'+n,val(s,m.mid,x),'auto');
-    put('E'+n,val(s,m.cw,x),'auto');
-    put('F'+n,val(s,m.pr,x),'auto');
-    put('H'+n,val(s,m.fin,x),'auto');
-    put('M'+n,s.st&&s.st!=SL[0]?s.st:'','text');
-   }else{
-    // Clear only data-entry cells. Formula cells G/I/J/K/L stay exactly as supplied by the template.
-    for(const col of ['A','B','C','D','E','F','H','M'])put(col+n,'');
-   }
-  }
+    const ch=[['A'+n,s.sn===''||isNaN(+s.sn)?i+1:+s.sn,'auto'],['B'+n,s.sid??'','text'],['C'+n,s.nm??'','text'],
+     ['D'+n,val(s,m.mid,x),'auto'],['E'+n,val(s,m.cw,x),'auto'],['F'+n,val(s,m.pr,x),'auto'],['H'+n,val(s,m.fin,x),'auto'],
+     ['M'+n,s.st&&s.st!=SL[0]?s.st:'','text']];
+    for(const [ref,v,k] of ch)row=patchCell(row,ref,v,k);
+   }else for(const col of ['A','B','C','D','E','F','H','M'])row=patchCell(row,col+n,'');
+   return row;
+  });
 
-  // Remove cached results ONLY from formula cells on the main grading sheet. This prompts
-  // Excel/Google Sheets to calculate them, while all formulas and support sheets remain intact.
-  xml=xml.replace(/<c\b([^>]*)>([\s\S]*?)<\/c>/g,(all,a,body)=>{if(!/<f\b/.test(body))return all;return '<c'+a+'>'+body.replace(/<v\b[^>]*>[\s\S]*?<\/v>/g,'')+'</c>'});
-
-  // Validate the one XML file we changed before packaging it.
+  const formulaCountAfter=(xml.match(/<f\b/g)||[]).length,rowCountAfter=(xml.match(/<row\b/g)||[]).length;
+  if(formulaCountAfter!==formulaCountBefore)throw new Error('Formula integrity check failed. No Excel file was created.');
+  if(rowCountAfter!==rowCountBefore)throw new Error('Worksheet row integrity check failed. No Excel file was created.');
   const chk=new DOMParser().parseFromString(xml,'application/xml');
-  if(chk.getElementsByTagName('parsererror').length)throw new Error('The generated grading-sheet XML is invalid. Export stopped before creating a broken Excel file.');
+  if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
   zip.file(P+'1.xml',xml);
 
-  // Do NOT rewrite workbook.xml, calculation-chain relationships, content types, or support sheets.
-  // Keeping the original package structure prevents Excel's "problem with some content" repair dialog.
-  const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
-  const b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
+  // Keep every formula, calcChain entry, chart, style, relationship and supporting sheet intact.
+  // Only request a fresh calculation when Excel/Google Sheets opens the workbook.
+  const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);
+  if(wbFile){let wx=await wbFile.async('string');
+   if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');
+   zip.file(wbPath,wx);
+  }
+
+  const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(e){console.error(e);alert('Excel export failed safely: '+e.message)}
 }
