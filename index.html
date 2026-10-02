@@ -29,6 +29,7 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
@@ -68,7 +69,7 @@ const LS=l=>S.studs.filter(s=>!l||s.lab===l).sort((a,b)=>String(a.sn).localeComp
 const St=id=>db.collection('students').doc(id),Cf=()=>db.doc('cfg/main');
 function calc(s){const m={},it=S.cfg.items,g=s.g||{};
  const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
-  if(i.t=='in')r=g[k]===undefined||g[k]===''?null:+g[k];
+  if(i.t=='in')r=g[k]===undefined||g[k]===''||isNaN(+g[k])?null:+g[k];
   else if(i.t=='att'){const a=Object.values(s.att||{}),p=a.filter(x=>x=='P').length,b=a.filter(x=>x=='A').length;r=i.mode=='pen'?Math.max(0,i.max-b*i.pen):p/S.cfg.weeks*i.max}
   else if(i.t=='grp'){let xs=(i.src||[]).map(v).filter(x=>x!==null).sort((a,b)=>b-a);if(i.top>0)xs=xs.slice(0,i.top);
    if(xs.length){r=xs.reduce((a,b)=>a+b,0);if(i.agg=='avg')r/=xs.length;r*=i.mul}}
@@ -127,11 +128,11 @@ function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map
 
 /* ---------- grades ---------- */
 function vGr(){const it=S.cfg.items;
- return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button class=g onclick=exGr()>Export grades Excel</button></div>
+ return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (template)</button><button class=g onclick=exGr()>Export simple grades</button></div>
 <p class=m>Shaded columns are calculated. Blank scores are ignored in groups and count as 0 in sums.</p></div>
-<div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}</tr>
-${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input type=number step=any data-f="${s._}_${i.k}" value="${m[i.k]??''}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}`}).join('')}</table></div>`}
-function setG(id,k,v){St(id).update({['g.'+k]:v===''?FV():+v})}
+<div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
+${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input data-f="${s._}_${i.k}" inputmode=decimal value="${esc((s.g||{})[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
+function setG(id,k,v){v=v.trim();const n=+v;St(id).update({['g.'+k]:v===''?FV():isNaN(n)?v:n})}
 
 /* ---------- settings ---------- */
 function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
@@ -140,7 +141,7 @@ function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Su
 <label>Number of weeks<input type=number min=1 max=30 ${S.admin?'':'disabled'} value="${c.weeks}" onchange="Cf().update({weeks:+this.value||12})"></label></div>
 <div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
 ${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
-<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>`}
+<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>${tplCards(c)}`}
 function editItem(k,t){const i=k?{...S.cfg.items.find(x=>x.k===k)}:{k:'c'+Date.now(),t,n:'',max:10,src:[],top:0,agg:'avg',mul:1,mode:'ratio',pen:1},o=S.cfg.items.filter(x=>x.k!==i.k),sel=(a,b)=>a==b?'selected':'';
  $('#modal').innerHTML=`<div class=ov><div class=card><h3>${k?'Edit':'New'} item</h3>
 <label>Name<input id=m_n value="${esc(i.n)}"></label><label>Max grade<input id=m_max type=number step=any value="${i.max}"></label>
@@ -154,5 +155,49 @@ function saveItem(k,t){const g=x=>$('#m_'+x)?.value,i={k,t,n:g('n')||'Item',max:
  if(t=='grp'){i.top=+g('top')||0;i.agg=g('agg');i.mul=g('mul')===''?1:+g('mul')}
  const it=S.cfg.items.slice(),x=it.findIndex(y=>y.k===k);x<0?it.push(i):it[x]=i;Cf().update({items:it});$('#modal').innerHTML=''}
 function delItem(k){if(!confirm('Remove this item?'))return;Cf().update({items:S.cfg.items.filter(i=>i.k!==k).map(i=>i.src?{...i,src:i.src.filter(x=>x!==k)}:i)})}
+const CRS0={univ:'Galala University',prog:'PharmD-Clinical Pharmacy Program',sem:'FALL 2025-2026',code:'PPC101',name:'MEDICINAL PLANTS',ch:'3',inst:'Assoc. Prof. Dr. Reda Foad Abdelhameed'};
+const SL=['Regular Student','Midterm Excuse','Final Exam Excuse','Withdraw','Incomplete Approved','Repeat Course_Failed','Repeat Course_Improve','Cheating','Other'];
+const CL=[['univ','University'],['prog','Program'],['sem','Semester'],['code','Course code'],['name','Course name'],['ch','Credit hours'],['inst','Instructor name']];
+const TC=[['mid','Midterm'],['cw','Class work (Quizzes + Project)'],['pr','Practical exam'],['fin','Final']];
+function tplCards(c){const ro=S.admin?'':'disabled';return `<div class=card><h3>Excel template</h3>
+<p class=m>Upload your template once (use_this.xlsx). Then choose which grading item fills each template column.</p>
+<div class=row><input type=file id=tf hidden accept=".xlsx" onchange="upTpl(this)"><button class=g ${ro} onclick="$('#tf').click()">Upload template (.xlsx)</button><button class=g ${ro} onclick=useTpl()>Use template items</button></div>
+${TC.map(([k,n])=>`<label>${n}<select ${ro} onchange="setMap('${k}',this.value)"><option value="">Choose item</option>${c.items.map(i=>`<option value="${i.k}" ${(c.map||{})[k]==i.k?'selected':''}>${esc(i.n)}</option>`).join('')}</select></label>`).join('')}
+${CL.map(([k,n])=>`<label>${n}<input ${ro} value="${esc((c.course||{})[k]??CRS0[k])}" onchange="setCrs('${k}',this.value)"></label>`).join('')}</div>`}
+function setSt(id,v){St(id).update({st:v})}
+function setCrs(k,v){Cf().set({course:{[k]:v}},{merge:true})}
+function setMap(k,v){Cf().set({map:{[k]:v}},{merge:true})}
+function useTpl(){if(!confirm('Replace the grading items with Midterm, Class work, Practical exam and Final?'))return;
+ Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
+function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+ r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
+ if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
+ const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
+ const t=await db.doc('cfg/template').get();if(!t.exists)return alert('Upload the template in Settings first.');
+ const zip=await JSZip.loadAsync(t.data().b64,{base64:true}),P='xl/worksheets/sheet',rd=f=>zip.file(f).async('string');
+ const sc=x=>x.replace(/<c\b([^>]*)>(<f\b[^>]*\/>|<f\b[^>]*>[^<]*<\/f>)(<v>[^<]*<\/v>)?<\/c>/g,(a,b,f)=>`<c${b.replace(/\st="[^"]*"/,'')}>${f}</c>`);
+ const d=new DOMParser().parseFromString(await rd(P+'1.xml'),'application/xml'),NS=d.documentElement.namespaceURI,cells=[...d.getElementsByTagName('c')];
+ const mk=(n,x)=>{const e=d.createElementNS(NS,n);if(x!=null)e.textContent=x;return e};
+ const put=(e,v,f)=>{[...e.childNodes].forEach(n=>e.removeChild(n));e.removeAttribute('t');if(f)return void e.appendChild(mk('f',f));
+  if(v===''||v==null)return;const n=typeof v=='number'?v:/^-?\d+(\.\d+)?$/.test(String(v).trim())?+v:NaN;
+  if(!isNaN(n))e.appendChild(mk('v',n));else{e.setAttribute('t','inlineStr');const q=mk('is');q.appendChild(mk('t',String(v)));e.appendChild(q)}};
+ const mx=k=>+it(m[k]).max||0,G=mx('mid')+mx('cw')+mx('pr');
+ const H={B1:cr.univ,D1:cr.prog,O1:cr.sem,E2:cr.code,H2:cr.name,M2:cr.ch,O2:cr.inst,D4:mx('mid'),E4:mx('cw'),F4:mx('pr'),G4:G,H4:mx('fin'),I4:G+mx('fin')};
+ const f5={};cells.forEach(e=>{const r=e.getAttribute('r');if(r=='J5'||r=='K5')f5[r[0]]=e.getElementsByTagName('f')[0].textContent});
+ const mc=ss.map(calc),val=(s,k,x)=>{const g=(s.g||{})[k],i=it(k);return i.t=='in'&&typeof g=='string'&&g!==''?g:x[k]};
+ cells.forEach(e=>{const r=e.getAttribute('r'),[,col,rw]=r.match(/^([A-Z]+)(\d+)$/),n=+rw;
+  if(r in H)return put(e,H[r]);if(n<5||n>713)return;
+  if(col=='J'||col=='K')return put(e,null,f5[col].replace(/\b([A-Z]{1,2})5(?!\d)/g,'$1'+n));
+  const i=n-5,s=ss[i],x=mc[i],V={A:s&&(s.sn===''||isNaN(+s.sn)?i+1:+s.sn),B:s&&s.sid,C:s&&s.nm,D:s&&val(s,m.mid,x),E:s&&val(s,m.cw,x),F:s&&val(s,m.pr,x),H:s&&val(s,m.fin,x),M:s&&s.st&&s.st!=SL[0]?s.st:''};
+  if(col in V)put(e,V[col])});
+ zip.file(P+'1.xml',sc('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(d)));
+ for(let k=2;k<=5;k++)zip.file(P+k+'.xml',sc(await rd(P+k+'.xml')));
+ zip.file('xl/workbook.xml',(await rd('xl/workbook.xml')).replace(/<calcPr[^>]*\/>/,'<calcPr calcId="162913" fullCalcOnLoad="1"/>'));
+ zip.remove('xl/calcChain.xml');
+ for(const f of['[Content_Types].xml','xl/_rels/workbook.xml.rels'])zip.file(f,(await rd(f)).replace(/<(Override|Relationship)\b[^>]*calcChain[^>]*\/>/g,''));
+ const b=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
+ a.href=URL.createObjectURL(b);a.download=(cr.code||'Course')+'_Course_Grading.xlsx';a.click()}
 boot();
 </script></body></html>
