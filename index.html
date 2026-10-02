@@ -19,7 +19,8 @@ label{display:block;margin:8px 0;color:var(--m);font-size:13px}label input,label
 table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--b);white-space:nowrap;text-align:center}
 th{background:#e8ecf3;font-size:12px}td.n,th.n{text-align:left;position:sticky;left:0;border-right:1px solid var(--b)}td.n{background:#fff}th.n{background:#e8ecf3}
 td input{width:64px;padding:5px;text-align:center}td.k{background:#eef1f7}
-.s{width:36px;height:34px;padding:0;background:#e3e8f0;color:var(--t);font-size:16px}.s.P{background:#d1fadf;color:var(--g)}.s.A{background:#fee4e2;color:var(--r)}
+.s{width:36px;height:34px;padding:0;background:#e3e8f0;color:var(--t);font-size:16px}.s.P{background:#d1fadf;color:var(--g)}.s.A{background:#fee4e2;color:var(--r)}.s.X{background:#dbeafe;color:#1d4ed8}
+.scorebox{display:flex;gap:4px;align-items:center;justify-content:center}.scorebox input{width:62px}.absbtn{padding:5px 6px;border:1px solid var(--b);background:#fff;color:var(--m);font-size:11px}.absbtn.on{background:#fee4e2;color:var(--r);border-color:#f3b4ae;font-weight:700}.badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 8px;background:#eef1f7;color:var(--m);font-size:12px}.badge.blue{background:#dbeafe;color:#1d4ed8}.badge.warn{background:#fff3cd;color:#8a5b00}.warnbtn{padding:4px 7px;background:#fff3cd;color:#8a5b00;border:1px solid #f1d58a;font-size:12px}.weekdate{display:block;font-size:10px;color:var(--m);font-weight:400;margin-top:2px}.visitlist{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:8px;margin-top:8px}.visititem{display:flex;gap:8px;align-items:center;padding:4px 0}.visititem span{flex:1}.policy{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.flagname{box-shadow:inset 4px 0 #f59e0b}.compact{max-width:150px}
 .ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}.ov .card{width:100%;max-width:420px;max-height:90vh;overflow:auto;margin:0}
 pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
 .e{color:var(--r)}.m{color:var(--m);font-size:13px}
@@ -31,11 +32,11 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-const APP_VERSION='5.0';
+const APP_VERSION='7.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
-let S={tab:'att',lab:'',gl:'',admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started;
+let S={tab:'att',lab:'',gl:'',aw:1,admin:false,cfg:null,labs:[],studs:[],user:null},db,auth,started;
 
 /* ---------- start-up, setup, login ---------- */
 const CFG={apiKey:"AIzaSyAxgPrBcVszBieseQXfaz5JqcO_UAAopg0",authDomain:"labtrack-c55fb.firebaseapp.com",projectId:"labtrack-c55fb",storageBucket:"labtrack-c55fb.firebasestorage.app",messagingSenderId:"561200653207",appId:"1:561200653207:web:e7cb27d82c1b97e3575ad2"};
@@ -61,85 +62,98 @@ function login(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack</
 <p class=m>The first person to sign in becomes the admin.</p></div></main>`}
 function signIn(){auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(e=>login(e.message))}
 function start(){if(started)return;started=1;
- db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set({weeks:12,locked:{},items:DEF,admins:[S.user.uid]});S.cfg=d.data();S.admin=S.cfg.admins.includes(S.user.uid);render()},e=>alert(e.message));
+ db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set({weeks:12,locked:{},items:DEF,admins:[S.user.uid],altLabLimit:2,absenceWarn:3});S.cfg=d.data();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});if(S.aw>S.cfg.weeks)S.aw=S.cfg.weeks;render()},e=>alert(e.message));
  db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));if(!S.labs.find(l=>l.id===S.lab))S.lab=S.labs[0]?.id||'';render()});
  db.collection('students').onSnapshot(q=>{S.studs=q.docs.map(d=>({_:d.id,...d.data()}));render()})}
 
 /* ---------- helpers ---------- */
 const LS=l=>S.studs.filter(s=>!l||s.lab===l).sort((a,b)=>String(a.sn).localeCompare(String(b.sn),undefined,{numeric:true})||String(a.nm).localeCompare(String(b.nm)));
 const St=id=>db.collection('students').doc(id),Cf=()=>db.doc('cfg/main');
+const norm=x=>String(x??'').trim().toLowerCase(),labName=id=>S.labs.find(l=>l.id===id)?.name||'another lab';
+const attN=s=>rng(S.cfg.weeks).filter(w=>['P','X'].includes((s.att||{})[w])).length;
+const absN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='A').length;
+const altN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='X').length;
+const shortDate=d=>{if(!d)return'';const x=new Date(d+'T00:00:00');return isNaN(x)?d:x.toLocaleDateString(undefined,{month:'short',day:'numeric'})};
 function calc(s){const m={},it=S.cfg.items,g=s.g||{};
  const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
-  if(i.t=='in')r=g[k]===undefined||g[k]===''||isNaN(+g[k])?null:+g[k];
-  else if(i.t=='att'){const a=Object.values(s.att||{}),p=a.filter(x=>x=='P').length,b=a.filter(x=>x=='A').length;r=i.mode=='pen'?Math.max(0,i.max-b*i.pen):p/S.cfg.weeks*i.max}
-  else if(i.t=='grp'){let xs=(i.src||[]).map(v).filter(x=>x!==null).sort((a,b)=>b-a);if(i.top>0)xs=xs.slice(0,i.top);
-   if(xs.length){r=xs.reduce((a,b)=>a+b,0);if(i.agg=='avg')r/=xs.length;r*=i.mul}}
+  if(i.t=='in'){const q=g[k];r=q==='Abs'?0:q===undefined||q===''||isNaN(+q)?null:+q}
+  else if(i.t=='att'){const p=attN(s),b=absN(s);r=i.mode=='pen'?Math.max(0,i.max-b*i.pen):p/S.cfg.weeks*i.max}
+  else if(i.t=='grp'){let xs=(i.src||[]).map(v).filter(x=>x!==null).sort((a,b)=>b-a);if(i.top>0)xs=xs.slice(0,i.top);if(xs.length){r=xs.reduce((a,b)=>a+b,0);if(i.agg=='avg')r/=xs.length;r*=i.mul}}
   else if(i.t=='sum')r=(i.src||[]).reduce((a,k)=>a+(v(k)||0),0);
   return m[k]=r===null?null:Math.round(r*100)/100};
  it.forEach(i=>v(i.k));return m}
 
 /* ---------- main view ---------- */
 function render(){if(!S.cfg||!S.user)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f;
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v6</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v7</span></b><small>${esc(S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut().then(()=>location.reload())">Sign out</button></header>
 <nav>${[['att','Attendance'],['gr','Grades'],['set','Settings']].map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
 <main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);e&&e.focus()}}
 
 /* ---------- attendance ---------- */
-function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks;
+function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(0,+S.cfg.altLabLimit||0),thr=Math.max(0,+S.cfg.absenceWarn||0);
  const top=`<div class=card><div class=row><select onchange="S.lab=this.value;render()">${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.lab?'selected':''}>${esc(x.name)}</option>`).join('')||'<option>No labs yet</option>'}</select><button onclick=addLab()>Add lab</button>${l?'<button class=d onclick=delLab()>Remove lab</button>':''}</div>`;
  if(!l)return top+'<p class=m>Add your first lab to start.</p></div>';
- return top+`<div class=row><label>Date<input type=date data-f=ld value="${esc(l.date)}" onchange="db.doc('labs/${l.id}').update({date:this.value})"></label>
-<label>Place<input data-f=lp value="${esc(l.place)}" onchange="db.doc('labs/${l.id}').update({place:this.value})"></label></div>
+ const visitors=S.studs.filter(s=>s.lab!==l.id&&(s.att||{})[S.aw]=='X'&&(s.alt||{})[S.aw]===l.id).sort((a,b)=>String(a.nm).localeCompare(String(b.nm)));
+ const flagged=LS(l.id).filter(s=>absN(s)>thr).length;
+ return top+`<div class=row><label>Place<input data-f=lp value="${esc(l.place)}" onchange="db.doc('labs/${l.id}').update({place:this.value})"></label>
+<label>Session week<select class=compact onchange="S.aw=+this.value;render()">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label>
+<label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>
+<button onclick=visitorModal() ${S.cfg.locked?.[S.aw]&&!S.admin?'disabled':''}>+ Visiting student</button>
+${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div>
+<div class=policy><span class="badge blue">Other-lab allowance: ${lim}</span><span class=badge>Warning after &gt; ${thr} absences</span></div>
 <div class=row><input id=a1 data-f=a1 placeholder=Serial style=width:70px><input id=a2 data-f=a2 placeholder=ID style=width:110px><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div>
 <div class=row><input type=file id=f1 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)">
-<button class=g onclick="$('#f1').click()">Upload names (Excel)</button><button class=g onclick="$('#f2').click()">Upload serials (Excel)</button><button class=g onclick=exLab()>Export lab Excel</button></div>
-<p class=m>Tap a cell to cycle: present, absent, empty.${S.admin?' Tap a week header to lock or unlock it.':''}</p></div>
-<div class=w><table><tr><th>#<th>ID<th class=n>Name${rng(W).map(w=>`<th onclick="lock(${w})" ${S.admin?'style=cursor:pointer':''}>W${w}${S.cfg.locked?.[w]?' &#128274;':''}`).join('')}<th>Att<th>Abs<th></tr>
-${LS(l.id).map(s=>{const a=s.att||{},c=v=>rng(W).filter(w=>a[w]===v).length;
- return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${rng(W).map(w=>`<td><button class="s ${a[w]||''}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="mark('${s._}',${w},'${a[w]||''}')">${a[w]=='P'?'&#10003;':a[w]=='A'?'&#10007;':'&middot;'}</button>`).join('')}<td>${c('P')}<td>${c('A')}<td><button class="g s" onclick="delSt('${s._}')">&#10005;</button>`}).join('')}</table></div>`}
-function mark(id,w,cur){const n=cur==''?'P':cur=='P'?'A':'';St(id).update({['att.'+w]:n==''?FV():n})}
+<button class=g onclick="$('#f1').click()">Sync lab roster (Excel)</button><button class=g onclick="$('#f2').click()">Upload serials (override)</button><button class=g onclick=exLab()>Export lab Excel</button></div>
+<p class=m>Tap attendance to cycle present → absent → empty. ↗ means the student attended a different lab and counts as present. Use “+ Visiting student” in the lab they actually attended.${S.admin?' Tap a week header to lock or unlock it.':''}</p>
+${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${S.cfg.locked?.[S.aw]&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
+<div class=w><table><tr><th>#<th>ID<th class=n>Name${rng(W).map(w=>`<th onclick="lock(${w})" ${S.admin?'style=cursor:pointer':''}>W${w}${S.cfg.locked?.[w]?' 🔒':''}<span class=weekdate>${esc(shortDate((l.dates||{})[w]))}</span>`).join('')}<th>Att<th>Abs<th>Other</tr>
+${LS(l.id).map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;
+ return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class="n ${flag?'flagname':''}">${esc(s.nm)}${rng(W).map(w=>{const v=a[w]||'',title=v=='X'?`Attended in ${labName((s.alt||{})[w])}`:'';return `<td><button title="${esc(title)}" class="s ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="mark('${s._}',${w},'${v}')">${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</button>`}).join('')}<td>${ac}<td>${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ ${bc}</button>`:bc}<td><span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">${xc}/${lim}</span>`}).join('')}</table></div>`}
+function setWeekDate(w,v){if(S.lab)db.doc('labs/'+S.lab).update({['dates.'+w]:v})}
+function mark(id,w,cur){let n=cur==''?'P':cur=='P'?'A':'';const u={['att.'+w]:n==''?FV():n,['alt.'+w]:FV()};St(id).update(u)}
 function lock(w){if(S.admin)Cf().update({['locked.'+w]:!S.cfg.locked?.[w]})}
-function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),date:'',place:''}).then(r=>{S.lab=r.id})}
+function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),place:'',dates:{}}).then(r=>{S.lab=r.id})}
 function delLab(){if(!confirm('Remove this lab and all its students?'))return;const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));b.commit()}
-function addSt(){const n=$('#a3').value.trim(),i=$('#a2').value.trim();if(!n&&!i)return;db.collection('students').add({lab:S.lab,sn:$('#a1').value.trim(),sid:i,nm:n,att:{},g:{}})}
+function addSt(){const n=$('#a3').value.trim(),i=$('#a2').value.trim();if(!n&&!i)return;db.collection('students').add({lab:S.lab,sn:$('#a1').value.trim(),sid:i,nm:n,att:{},alt:{},g:{}})}
 function delSt(id){if(confirm('Remove this student?'))St(id).delete()}
+function visitorModal(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');const pool=S.studs.filter(s=>s.lab!==S.lab).sort((a,b)=>String(a.nm).localeCompare(String(b.nm)));
+ if(!pool.length)return alert('There are no students in other labs.');$('#modal').innerHTML=`<div class=ov><div class=card><h3>Add visiting student</h3><p class=m>Week ${w}${(l.dates||{})[w]?' · '+esc(shortDate((l.dates||{})[w])):''} · attending ${esc(l.name)}</p><input id=vq placeholder="Search ID or name" oninput="filterVisitor(this.value)" style="width:100%"><label>Student<select id=vs size=8 style="height:220px">${pool.map(s=>`<option value="${s._}" data-q="${esc(norm((s.sid||'')+' '+(s.nm||'')+' '+labName(s.lab)))}">${esc(s.sid||'—')} — ${esc(s.nm)} — ${esc(labName(s.lab))}</option>`).join('')}</select></label><div class=row><button onclick=saveVisitor()>Mark attended here</button><button class=g onclick="$('#modal').innerHTML=''">Cancel</button></div></div></div>`}
+function filterVisitor(q){q=norm(q);[...document.querySelectorAll('#vs option')].forEach(o=>o.hidden=q&&!o.dataset.q.includes(q))}
+function saveVisitor(){const id=$('#vs')?.value,s=S.studs.find(x=>x._===id),w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0);if(!s)return alert('Choose a student.');const cur=(s.att||{})[w]||'',used=altN(s);if(cur!='X'&&used>=lim)return alert(`${s.nm} has already used ${used}/${lim} other-lab attendances.`);if(lim<1&&cur!='X')return alert('Other-lab attendance allowance is currently 0.');if(cur=='P'&&!confirm('This student is already marked present in the home lab for this week. Replace it with attendance in this lab?'))return;St(id).update({['att.'+w]:'X',['alt.'+w]:S.lab}).then(()=>{$('#modal').innerHTML=''})}
+function clearVisitor(id,w){if(S.cfg.locked?.[w]&&!S.admin)return;St(id).update({['att.'+w]:FV(),['alt.'+w]:FV()})}
+async function warnStudent(id){const s=S.studs.find(x=>x._===id);if(!s)return;const n=absN(s),t=Math.max(0,+S.cfg.absenceWarn||0),msg=`Attendance warning: ${s.nm}${s.sid?' ('+s.sid+')':''} has ${n} recorded absences, exceeding the course threshold of ${t}. Please review your attendance record.`;try{if(navigator.share){await navigator.share({title:'Attendance warning',text:msg});return}if(navigator.clipboard){await navigator.clipboard.writeText(msg);alert('Warning copied. You can paste it into WhatsApp, email, or another message.');return}}catch(e){if(e?.name==='AbortError')return}prompt('Copy this warning:',msg)}
 
 /* ---------- Excel import / export ---------- */
 function parse(rows){if(!rows.length)return[];const h=rows[0].map(x=>String(x).toLowerCase().trim()),f=r=>h.findIndex(x=>r.test(x));
- let c={sn:f(/serial|^sn$|^no\.?$|^#$/),sid:f(/\bid\b|code/),nm:f(/name/)},st=1;
- if(c.sid<0&&c.nm<0){st=0;c=rows[0].length>2?{sn:0,sid:1,nm:2}:{sn:-1,sid:0,nm:1}}
- return rows.slice(st).filter(r=>r.some(x=>x!=='')).map(r=>({sn:c.sn<0?'':r[c.sn],sid:c.sid<0?'':String(r[c.sid]).trim(),nm:c.nm<0?'':String(r[c.nm]).trim()}))}
-function imp(inp,kind){const f=inp.files[0];if(!f)return;const r=new FileReader();
- r.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'}),rows=parse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}));
-  const b=db.batch(),col=db.collection('students');let add=0,upd=0,miss=0;
-  const find=(r,pool)=>pool.find(s=>r.sid?s.sid===r.sid:r.nm&&String(s.nm).toLowerCase()===r.nm.toLowerCase());
-  rows.forEach(r=>{
-   if(kind==0){const s=find(r,LS(S.lab));
-    if(s){const u={};if(r.nm)u.nm=r.nm;if(r.sn!=='')u.sn=r.sn;if(Object.keys(u).length)b.update(col.doc(s._),u);upd++}
-    else{b.set(col.doc(),{lab:S.lab,sn:r.sn,sid:r.sid,nm:r.nm,att:{},g:{}});add++}}
-   else{const s=find(r,S.studs);if(s&&r.sn!==''){b.update(col.doc(s._),{sn:r.sn});upd++}else miss++}});
-  b.commit().then(()=>alert(kind?`Serials updated: ${upd}. Not found: ${miss}.`:`Students added: ${add}. Updated: ${upd}.`)).catch(e=>alert(e.message));inp.value=''};
- r.readAsArrayBuffer(f)}
+ let c={sn:f(/serial|^sn$|^no\.?$|^#$/),sid:f(/\bid\b|code/),nm:f(/name/)},st=1;if(c.sid<0&&c.nm<0){st=0;c=rows[0].length>2?{sn:0,sid:1,nm:2}:{sn:-1,sid:0,nm:1}}
+ return rows.slice(st).filter(r=>r.some(x=>x!=='')).map(r=>({sn:c.sn<0?'':String(r[c.sn]??'').trim(),sid:c.sid<0?'':String(r[c.sid]??'').trim(),nm:c.nm<0?'':String(r[c.nm]??'').trim()}))}
+async function commitOps(ops){for(let i=0;i<ops.length;i+=400){const b=db.batch();for(const o of ops.slice(i,i+400)){if(o.t=='delete')b.delete(o.ref);else if(o.t=='set')b.set(o.ref,o.data);else b.update(o.ref,o.data)}await b.commit()}}
+function imp(inp,kind){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rows=parse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''})),col=db.collection('students');
+ if(kind==0){const pool=LS(S.lab),seen=new Set(),keep=new Set(),adds=[];for(const q of rows){const key=q.sid?'i:'+norm(q.sid):q.nm?'n:'+norm(q.nm):'';if(!key||seen.has(key))continue;seen.add(key);let s=q.sid?pool.find(x=>norm(x.sid)===norm(q.sid)):null;if(!s&&q.nm)s=pool.find(x=>norm(x.nm)===norm(q.nm));if(s)keep.add(s._);else adds.push(q)}const rem=pool.filter(s=>!keep.has(s._));if(!confirm(`Synchronize this lab roster?\n\nKeep unchanged: ${keep.size}\nAdd: ${adds.length}\nRemove: ${rem.length}\n\nAttendance and grades of kept students will not be changed.`)){inp.value='';return}const ops=[];rem.forEach(s=>ops.push({t:'delete',ref:col.doc(s._)}));adds.forEach(q=>ops.push({t:'set',ref:col.doc(),data:{lab:S.lab,sn:q.sn,sid:q.sid,nm:q.nm,att:{},alt:{},g:{}}}));await commitOps(ops);alert(`Roster synchronized. Kept: ${keep.size}. Added: ${adds.length}. Removed: ${rem.length}.`)}
+ else{let upd=0,miss=0;const ops=[];for(const q of rows){const s=q.sid?S.studs.find(x=>norm(x.sid)===norm(q.sid)):(q.nm?S.studs.find(x=>norm(x.nm)===norm(q.nm)):null);if(s){ops.push({t:'update',ref:col.doc(s._),data:{sn:String(q.sn??'').trim()}});upd++}else miss++}await commitOps(ops);alert(`Serial numbers overridden: ${upd}. Not found: ${miss}.`)}
+ }catch(x){alert('Import failed: '+x.message)}finally{inp.value=''}};r.readAsArrayBuffer(f)}
 function save(rows,name){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name.replace(/[^\w-]+/g,'_')+'.xlsx')}
-function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab',l.name],['Date',l.date||''],['Place',l.place||''],[],['Serial','ID','Name',...rng(W).map(w=>'Week '+w),'Attended sessions','Absent sessions']];
- LS(l.id).forEach(s=>{const a=s.att||{},c=v=>rng(W).filter(w=>a[w]===v).length;rows.push([s.sn,s.sid,s.nm,...rng(W).map(w=>a[w]=='P'?'Attended':a[w]=='A'?'Absent':''),c('P'),c('A')])});save(rows,'Lab_'+l.name)}
-function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];
- LS(S.gl).forEach(s=>{const m=calc(s);rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>m[i.k]??'')])});save(rows,'Grades')}
+function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab',l.name],['Place',l.place||''],[],['Serial','ID','Name',...rng(W).map(w=>'Week '+w+((l.dates||{})[w]?' - '+(l.dates||{})[w]:'')),'Attended sessions','Absent sessions','Other-lab sessions']];
+ LS(l.id).forEach(s=>{const a=s.att||{};rows.push([s.sn,s.sid,s.nm,...rng(W).map(w=>a[w]=='P'?'Attended':a[w]=='A'?'Absent':a[w]=='X'?'Attended in '+labName((s.alt||{})[w]):''),attN(s),absN(s),altN(s)])});save(rows,'Lab_'+l.name)}
+function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
 
 /* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items;
- return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v6 dynamic ranges)</button><button class=g onclick=exGr()>Export simple grades</button></div>
-<p class=m>Shaded columns are calculated. Blank scores are ignored in groups and count as 0 in sums.</p></div>
+function vGr(){const it=S.cfg.items;return `<div class=card><div class=row><select onchange="S.gl=this.value;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select><button onclick=exTpl()>Export course Excel (v7)</button><button class=g onclick=exGr()>Export simple grades</button></div>
+<p class=m>Use ABS beside any score when a student was absent. ABS counts as 0 in calculated groups/sums; a blank score stays unentered.</p></div>
 <div class=w><table><tr><th>#<th>ID<th class=n>Name${it.map(i=>`<th>${esc(i.n)}${i.max?'<br>/'+i.max:''}`).join('')}<th>Status</tr>
-${LS(S.gl).map(s=>{const m=calc(s);return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><input data-f="${s._}_${i.k}" inputmode=decimal value="${esc((s.g||{})[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)">`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
+${LS(S.gl).map(s=>{const m=calc(s),g=s.g||{};return `<tr><td>${esc(s.sn)}<td>${esc(s.sid)}<td class=n>${esc(s.nm)}${it.map(i=>i.t=='in'?`<td><div class=scorebox><input data-f="${s._}_${i.k}" inputmode=decimal ${g[i.k]==='Abs'?'disabled':''} value="${g[i.k]==='Abs'?'':esc(g[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)"><button class="absbtn ${g[i.k]==='Abs'?'on':''}" title="Mark absent" onclick="toggleScoreAbs('${s._}','${i.k}')">ABS</button></div>`:`<td class=k><b>${m[i.k]??''}</b>`).join('')}<td><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select>`}).join('')}</table></div>`}
 function setG(id,k,v){v=v.trim();const n=+v;St(id).update({['g.'+k]:v===''?FV():isNaN(n)?v:n})}
+function toggleScoreAbs(id,k){const s=S.studs.find(x=>x._===id),on=(s?.g||{})[k]==='Abs';St(id).update({['g.'+k]:on?FV():'Abs'})}
 
 /* ---------- settings ---------- */
 function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
  const desc=i=>i.t=='att'?(i.mode=='pen'?`max minus ${i.pen} per absence`:'attended / weeks x max'):i.t=='grp'?`${i.agg=='avg'?'average':'sum'} of ${i.top?'highest '+i.top+' of ':''}${(i.src||[]).map(nm).join(', ')}${i.mul!=1?' x '+i.mul:''}`:i.t=='sum'?(i.src||[]).map(nm).join(' + '):'';
- return `<div class=card><h3>Course settings</h3>${S.admin?'':'<p class=m>Only the admin can change settings and lock weeks.</p>'}
+ return `<div class=card><h3>Course settings</h3>${S.admin?'':'<p class=m>Only the admin can change grading structure and lock weeks.</p>'}
 <label>Number of weeks<input type=number min=1 max=30 ${S.admin?'':'disabled'} value="${c.weeks}" onchange="Cf().update({weeks:+this.value||12})"></label></div>
+<div class=card><h3>Attendance policy</h3><p class=m>These two values can be adjusted by any signed-in instructor.</p>
+<label>Other-lab attendance allowance per student<input type=number min=0 max=30 value="${c.altLabLimit??2}" onchange="Cf().set({altLabLimit:Math.max(0,+this.value||0)},{merge:true})"></label>
+<label>Absence warning threshold <span class=m>(warning appears after the student exceeds this number)</span><input type=number min=0 max=30 value="${c.absenceWarn??3}" onchange="Cf().set({absenceWarn:Math.max(0,+this.value||0)},{merge:true})"></label></div>
 <div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
 ${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
 <p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>${tplCards(c)}`}
@@ -172,7 +186,7 @@ function useTpl(){if(!confirm('Replace the grading items with Midterm, Class wor
  Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
 function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v6.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
+  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v7.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
 async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
  if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
  const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
@@ -206,10 +220,14 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
    2:[['E2',cr.code,'text'],['H2',cr.name,'text'],['M2',cr.ch,'auto'],['O2',cr.inst,'text']],
    4:[['D4',mx('mid'),'number'],['E4',mx('cw'),'number'],['F4',mx('pr'),'number'],['G4',G,'number'],['H4',mx('fin'),'number'],['I4',G+mx('fin'),'number']]
   };
+  // The source template has a handful of manually yellow-highlighted student rows.
+  // These style IDs are the matching non-yellow styles from the same template.
+  const unyellow={65:47,66:61,67:89,68:48,69:24,70:25,71:26,72:51,73:31,74:34,75:46,76:33,77:28,78:29,79:32,80:0,81:0};
+  const clearManualYellow=row=>row.replace(/(<c\b[^>]*\bs=")(\d+)("[^>]*>)/g,(a,p,n,q)=>unyellow[n]!==undefined?p+unyellow[n]+q:a);
 
   xml=xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,rn)=>{
    const n=+rn;if(heads[n]){for(const [ref,v,k] of heads[n])row=patchCell(row,ref,v,k);return row}
-   if(n<5||n>713)return row;
+   if(n<5||n>713)return row;row=clearManualYellow(row);
    const i=n-5,s=ss[i],x=mc[i];
    if(s){
     const ch=[['A'+n,s.sn===''||isNaN(+s.sn)?i+1:+s.sn,'auto'],['B'+n,s.sid??'','text'],['C'+n,s.nm??'','text'],
@@ -241,31 +259,35 @@ async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),c
   if(rowCountAfter!==rowCountBefore)throw new Error('Worksheet row integrity check failed. No Excel file was created.');
   const chk=new DOMParser().parseFromString(xml,'application/xml');
   if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
+  // Cached formula results belong to the old template data. Remove them safely so
+  // Excel/Sheets recomputes formulas from the newly exported grades instead of seeing stale values.
+  const clearFormulaCaches=sx=>sx.replace(/<c\b([^>]*?)\/>|<c\b([^>]*?)>([\s\S]*?)<\/c>/g,(whole,selfAttrs,attrs,body)=>{
+   if(selfAttrs!==undefined||!body||!/<f\b/.test(body))return whole;
+   return '<c'+attrs+'>'+body.replace(/<v>[\s\S]*?<\/v>/g,'')+'</c>';
+  });
+  xml=clearFormulaCaches(xml);
   zip.file(P+'1.xml',xml);
 
   // Apply the same dynamic COUNTIF/COUNTIFS ranges to all four statistics sheets.
   // Their formulas continue to point at Program_Course Code, but only through the
   // final populated student row instead of the template's fixed row 713.
   for(let k=2;k<=5;k++){
-   const path=P+k+'.xml',sx=dynamicCountifRanges(await rd(path),false);
+   const path=P+k+'.xml',sx=clearFormulaCaches(dynamicCountifRanges(await rd(path),false));
    const parsed=new DOMParser().parseFromString(sx,'application/xml');
    if(parsed.getElementsByTagName('parsererror').length)throw new Error('Statistics sheet '+k+' became invalid. No Excel file was created.');
    zip.file(path,sx);
   }
 
-  // Keep every formula, calcChain entry, chart, style and relationship intact.
-  // Only request a fresh calculation when Excel/Google Sheets opens the workbook.
-  const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);
-  if(wbFile){let wx=await wbFile.async('string');
-   // Keep the worksheet filter bounded to the actual exported student rows too.
-   wx=wx.replace(/(<definedName\b[^>]*name="_xlnm\._FilterDatabase"[^>]*>\s*'Program_Course Code'!\$I\$1:\$I\$)\d+(<\/definedName>)/,(_,a,b)=>a+lastDataRow+b);
-   if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');
-   zip.file(wbPath,wx);
-  }
+  // Formula text changed, so discard Excel's stale calculation chain and let Excel rebuild it.
+  // This is safer for Microsoft Excel than keeping a calcChain created for the old formulas.
+  zip.remove('xl/calcChain.xml');
+  const relPath='xl/_rels/workbook.xml.rels',relFile=zip.file(relPath);if(relFile){let rx=await relFile.async('string');rx=rx.replace(/<Relationship\b[^>]*(?:Type="[^"]*\/calcChain"|Target="calcChain\.xml")[^>]*\/>/g,'');zip.file(relPath,rx)}
+  const ctPath='[Content_Types].xml',ctFile=zip.file(ctPath);if(ctFile){let cx=await ctFile.async('string');cx=cx.replace(/<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g,'');zip.file(ctPath,cx)}
+  const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);if(wbFile){let wx=await wbFile.async('string');if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');else wx=wx.replace('</workbook>','<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/></workbook>');zip.file(wbPath,wx)}
 
   const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
   a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('LabTrack v6 — Excel export failed safely: '+e.message)}
+ }catch(e){console.error(e);alert('LabTrack v7 — Excel export failed safely: '+e.message)}
 }
 boot();
 </script></body></html>
