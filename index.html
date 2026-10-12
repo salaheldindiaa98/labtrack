@@ -1,598 +1,1612 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LabTrack</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lab Cash Challenge</title>
 <style>
-:root{--bg:#eceff3;--c:#fff;--t:#14213d;--m:#66718a;--p:#2b4acb;--b:#d3d9e3;--r:#b42318;--g:#067647}
-*{box-sizing:border-box}body{margin:0;font:15px Roboto,system-ui,sans-serif;background:var(--bg);color:var(--t)}
-header{background:var(--t);color:#fff;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-header b{font-size:18px;letter-spacing:.3px;margin-right:auto}header small{color:#aab4cc}
-nav{display:flex;gap:6px;padding:8px 12px;background:var(--c);border-bottom:1px solid var(--b)}nav button{flex:1}
-main{padding:12px;max-width:1100px;margin:auto}
-.card{background:var(--c);border:1px solid var(--b);border-radius:6px;padding:12px;margin-bottom:12px}
-h2,h3{margin:0 0 8px}
-button{font:inherit;border:0;border-radius:6px;padding:8px 12px;background:var(--p);color:#fff}
-button.g,nav button{background:#e3e8f0;color:var(--t)}nav button.on{background:var(--p);color:#fff}button.d{background:var(--r)}
-input,select,textarea{font:inherit;padding:8px;border:1px solid var(--b);border-radius:6px;background:#fff;color:var(--t);max-width:100%}
-label{display:block;margin:8px 0;color:var(--m);font-size:13px}label input,label select{display:block;width:100%;margin-top:3px}
-.ck{display:flex;gap:8px;align-items:center;color:var(--t);font-size:15px}.ck input{width:auto;margin:0}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.row label{margin:0}
-.w{overflow-x:auto;border:1px solid var(--b);border-radius:6px;background:var(--c)}
-table{border-collapse:collapse;width:100%}th,td{padding:6px 8px;border-bottom:1px solid var(--b);white-space:nowrap;text-align:center}
-th{background:#e8ecf3;font-size:12px}td.n,th.n{text-align:left;position:sticky;left:0;border-right:1px solid var(--b)}td.n{background:#fff}th.n{background:#e8ecf3}
-td input{width:64px;padding:5px;text-align:center}td.k{background:#eef1f7}
-.s{width:36px;height:34px;padding:0;background:#e3e8f0;color:var(--t);font-size:16px}.s.P{background:#d1fadf;color:var(--g)}.s.A{background:#fee4e2;color:var(--r)}.s.X{background:#dbeafe;color:#1d4ed8}
-.scorebox{display:flex;gap:4px;align-items:center;justify-content:center}.scorebox input{width:62px}.absbtn{padding:5px 6px;border:1px solid var(--b);background:#fff;color:var(--m);font-size:11px}.absbtn.on{background:#fee4e2;color:var(--r);border-color:#f3b4ae;font-weight:700}.badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 8px;background:#eef1f7;color:var(--m);font-size:12px}.badge.blue{background:#dbeafe;color:#1d4ed8}.badge.warn{background:#fff3cd;color:#8a5b00}.warnbtn{padding:4px 7px;background:#fff3cd;color:#8a5b00;border:1px solid #f1d58a;font-size:12px}.weekdate{display:block;font-size:10px;color:var(--m);font-weight:400;margin-top:2px}.visitlist{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:8px;margin-top:8px}.visititem{display:flex;gap:8px;align-items:center;padding:4px 0}.visititem span{flex:1}.policy{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.flagname{box-shadow:inset 4px 0 #f59e0b}.compact{max-width:150px}
+  :root{
+    --bg:#0b1020;
+    --panel:#121a31;
+    --panel2:#17213d;
+    --text:#f7f9ff;
+    --muted:#9aa7c7;
+    --green:#38d98a;
+    --green2:#1ca466;
+    --red:#ff6b6b;
+    --gold:#ffcf5a;
+    --blue:#6da8ff;
+    --line:#273455;
+    --shadow:0 18px 60px rgba(0,0,0,.32);
+    --radius:22px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(109,168,255,.14), transparent 28%),
+      radial-gradient(circle at 90% 10%, rgba(56,217,138,.12), transparent 24%),
+      var(--bg);
+    color:var(--text);
+  }
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer}
+  .app{max-width:1440px;margin:auto;padding:22px}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;
+    padding:18px 20px;border:1px solid var(--line);border-radius:24px;background:rgba(18,26,49,.88);
+    backdrop-filter:blur(14px);box-shadow:var(--shadow);position:sticky;top:12px;z-index:40;
+  }
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{
+    width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-size:26px;
+    background:linear-gradient(135deg,var(--green),#6df3be);color:#052015;font-weight:900;box-shadow:0 10px 24px rgba(56,217,138,.24);
+  }
+  .brand h1{font-size:18px;margin:0}
+  .brand p{font-size:12px;margin:3px 0 0;color:var(--muted)}
+  .top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+  .btn{
+    border:1px solid var(--line);background:#182341;color:white;padding:10px 14px;border-radius:14px;font-weight:750;
+    transition:.18s transform,.18s background,.18s border;
+  }
+  .btn:hover{transform:translateY(-1px);background:#1e2c51}
+  .btn.primary{background:linear-gradient(135deg,var(--green2),var(--green));color:#07160f;border:none}
+  .btn.danger{background:#3b1d2a;border-color:#6a2a42;color:#ffd9e4}
+  .btn.gold{background:#3a2e10;border-color:#6a5517;color:#ffe79d}
+  .layout{margin-top:14px;display:block}
+  .tabbar{display:flex;gap:8px;margin-top:14px}
+  .tabbtn{flex:1;padding:13px 10px;border-radius:14px;border:1px solid var(--line);background:#121c35;color:#c6d0ec;font-weight:800;font-size:15px;text-align:center}
+  .tabbtn.active{background:linear-gradient(135deg,var(--green2),var(--green));color:#07160f;border-color:transparent}
+  .pick-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin-top:12px}
+  .pick-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#121c35;color:#fff}
+  .pick-item small{display:block;color:var(--muted);margin-top:2px}
+  .pick-item.current{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.10)}
+  .score-row[data-sid]{cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .15s,border-color .15s}
+  .score-row.pressing{transform:scale(.98);border-color:rgba(56,217,138,.7)}
+  .hold-hint{margin:12px 0 0;color:var(--muted);font-size:13px}
+  .panel{
+    background:linear-gradient(180deg,rgba(20,30,56,.96),rgba(15,23,44,.98));
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  }
+  .side{padding:16px;position:sticky;top:104px}
+  .section-title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.11em;font-weight:800;margin:4px 0 10px}
+  .navbtn{
+    width:100%;text-align:left;border:none;background:transparent;color:#c6d0ec;padding:12px 12px;border-radius:13px;font-weight:700;margin-bottom:5px;
+  }
+  .navbtn.active,.navbtn:hover{background:#1c294a;color:white}
+  .lab-list{display:flex;flex-direction:column;gap:8px}
+  .lab-pill{
+    border:1px solid var(--line);background:#121c35;color:white;border-radius:14px;padding:12px;text-align:left;
+  }
+  .lab-pill.active{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.10)}
+  .lab-pill small{display:block;color:var(--muted);margin-top:3px}
+  .main{padding:20px;min-height:650px}
+  .hero{
+    padding:20px;border-radius:20px;background:linear-gradient(135deg,rgba(109,168,255,.14),rgba(56,217,138,.09));
+    border:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:center
+  }
+  .hero h2{margin:0 0 6px;font-size:25px}
+  .hero p{margin:0;color:var(--muted)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-width:320px}
+  .stat{background:#10182e;border:1px solid var(--line);border-radius:15px;padding:12px;text-align:center}
+  .stat b{font-size:21px;display:block}
+  .stat span{font-size:11px;color:var(--muted)}
+  .cards{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-top:22px
+  }
+  .money-card{
+    min-height:240px;border:0;border-radius:22px;padding:0;perspective:1000px;background:transparent;color:inherit
+  }
+  .money-card[disabled]{cursor:not-allowed;opacity:.55}
+  .card-inner{
+    position:relative;width:100%;height:240px;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.75,.15,1);
+  }
+  .money-card.revealed .card-inner{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    overflow:hidden;border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 46px rgba(0,0,0,.28)
+  }
+  .front{
+    background:
+      linear-gradient(135deg,rgba(255,255,255,.11),transparent 30%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.028) 0 9px, transparent 9px 18px),
+      linear-gradient(135deg,#1d734e,#29a56d);
+  }
+  .front:before,.front:after{
+    content:"";position:absolute;border:2px solid rgba(255,255,255,.19);border-radius:15px
+  }
+  .front:before{inset:13px}
+  .front:after{inset:22px}
+  .question-mark{font-size:84px;font-weight:950;line-height:1;text-shadow:0 8px 20px rgba(0,0,0,.25)}
+  .front .hint{font-size:12px;text-transform:uppercase;letter-spacing:.12em;font-weight:900;margin-top:8px}
+  .back{
+    transform:rotateY(180deg);background:
+      radial-gradient(circle at top right,rgba(255,207,90,.18),transparent 38%),
+      linear-gradient(160deg,#182645,#11192e);padding:18px;text-align:center;justify-content:space-between
+  }
+  .value{
+    display:inline-grid;place-items:center;min-width:88px;height:48px;border-radius:16px;padding:0 16px;background:#143f2e;color:#92f2c0;
+    font-size:27px;font-weight:950;margin-top:8px;border:1px solid rgba(56,217,138,.35)
+  }
+  .qtext{font-size:16px;font-weight:750;line-height:1.42}
+  .used-tag{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .empty{
+    margin-top:22px;padding:50px 20px;text-align:center;border:1px dashed var(--line);border-radius:20px;color:var(--muted)
+  }
+  .right{padding:16px;position:sticky;top:104px}
+  .score-list{display:flex;flex-direction:column;gap:9px}
+  .score-row{
+    display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;background:#111a31
+  }
+  .rank{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#1a294a;color:#a8baf0;font-weight:900}
+  .student-name{font-weight:800;font-size:13px}
+  .student-id{font-size:11px;color:var(--muted)}
+  .cash{color:#7cebb2;font-weight:950}
+  .tabs{display:flex;gap:8px;margin:20px 0 4px;flex-wrap:wrap}
+  .tab{border:1px solid var(--line);background:#111a31;color:#c4ceea;padding:9px 13px;border-radius:13px;font-weight:800}
+  .tab.active{background:#24355e;color:#fff}
+  .table-wrap{overflow:auto;margin-top:14px;border:1px solid var(--line);border-radius:16px}
+  table{width:100%;border-collapse:collapse;min-width:650px}
+  th,td{padding:12px;border-bottom:1px solid var(--line);text-align:left}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:#10182d}
+  td{font-size:13px}
+  .smallbtn{border:1px solid var(--line);background:#182441;color:white;padding:7px 10px;border-radius:10px;font-size:12px;font-weight:750}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:750}
+  .field input,.field textarea,.field select{
+    width:100%;border:1px solid var(--line);background:#0f172c;color:white;border-radius:13px;padding:11px 12px;outline:none
+  }
+  .field textarea{min-height:90px;resize:vertical}
+  .field input:focus,.field textarea:focus{border-color:#557ec0}
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(3,6,14,.75);display:none;align-items:center;justify-content:center;padding:18px;z-index:100;
+    backdrop-filter:blur(8px)
+  }
+  .modal-backdrop.show{display:flex}
+  .modal{
+    width:min(620px,100%);background:#111a31;border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:var(--shadow);
+    max-height:90vh;overflow:auto
+  }
+  .modal h3{margin:0 0 4px;font-size:23px}
+  .modal p{margin:0 0 18px;color:var(--muted)}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+  .active-student{
+    margin:14px 0;padding:12px 14px;border:1px solid rgba(109,168,255,.28);background:rgba(109,168,255,.08);border-radius:15px
+  }
+  .active-student b{display:block}
+  .active-student span{font-size:12px;color:var(--muted)}
+  .answer-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+  .answer-btn{
+    padding:16px;border-radius:16px;border:none;font-size:16px;font-weight:900
+  }
+  .correct{background:linear-gradient(135deg,#1aa264,#42e195);color:#06160e}
+  .wrong{background:linear-gradient(135deg,#a8374d,#ff6b6b);color:#2d060d}
+  .overlay-celebrate{
+    position:fixed;inset:0;pointer-events:none;display:none;z-index:140;overflow:hidden
+  }
+  .overlay-celebrate.show{display:block}
+  .celebrate-center{
+    position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);font-size:clamp(42px,7vw,88px);font-weight:1000;
+    text-shadow:0 10px 40px rgba(0,0,0,.55);animation:pop .9s ease both;text-align:center
+  }
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}55%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+  .confetti{position:absolute;width:10px;height:18px;top:-30px;animation:fall 2.2s linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(900deg)}}
+  .toast{
+    position:fixed;right:22px;bottom:22px;background:#10182d;border:1px solid var(--line);color:white;border-radius:14px;padding:12px 15px;z-index:180;
+    box-shadow:var(--shadow);transform:translateY(20px);opacity:0;transition:.25s
+  }
+  .toast.show{transform:none;opacity:1}
+  .badge{padding:5px 8px;border-radius:999px;font-size:11px;font-weight:850;background:#1b2949;color:#b9c8f3}
+  .manage-card{padding:15px;border:1px solid var(--line);background:#111a31;border-radius:16px;margin-top:12px}
+  .manage-card h4{margin:0 0 6px}
+  .manage-card p{margin:0;color:var(--muted);font-size:12px}
+  .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .mobilebar{display:none}
+  .restart-inline{margin-top:14px}
+  .lab-switcher{
+    margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:16px;
+    background:rgba(10,16,32,.48)
+  }
+  .lab-switcher label{
+    display:block;font-size:11px;color:var(--muted);font-weight:850;
+    text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px
+  }
+  .lab-switcher select{
+    width:100%;background:#0f172c;color:white;border:1px solid #344668;
+    border-radius:13px;padding:12px;font-weight:800;outline:none
+  }
+  .manage-labs-list{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .manage-lab-row{
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    padding:12px;border:1px solid var(--line);border-radius:14px;background:#0f182d
+  }
+  .manage-lab-row.current{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.08)}
+  .manage-lab-row b{display:block}
+  .manage-lab-row small{color:var(--muted)}
+  .manage-lab-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  .current-dot{color:#7cebb2;font-size:11px;font-weight:900;margin-left:6px}
+  @media(max-width:1060px){
+    .layout{grid-template-columns:220px 1fr}
+    .right{grid-column:1/-1;position:static}
+  }
+  @media(max-width:760px){
+    .app{padding:10px}
+    .topbar{top:6px;padding:12px}
+    .brand p{display:none}
+    .layout{display:block}
+    .side{position:static;margin-bottom:12px}
+    .main{padding:14px}
+    .right{margin-top:12px}
+    .hero{display:block}
+    .stats{min-width:0;margin-top:14px}
+    .form-grid{grid-template-columns:1fr}
+    .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .card-inner{height:210px}.money-card{min-height:210px}
+    .qtext{font-size:14px}
+  }
+  @media(max-width:460px){
+    .cards{grid-template-columns:1fr}
+    .top-actions .btn{display:none}
+    .top-actions .btn.primary{display:inline-flex}
+    .restart-inline{display:inline-flex;width:100%;justify-content:center;margin-top:14px}
+  }
 
-.searchbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.searchbar input{flex:1;min-width:220px}.searchcount{font-size:12px;color:var(--m)}
-.studenttable{border:1px solid var(--b);border-radius:6px;overflow:hidden;background:var(--c)}.studenthdr,.studentmain{display:grid;grid-template-columns:78px 132px minmax(0,1fr);align-items:stretch}.studenthdr{background:#e8ecf3;color:var(--t);font-size:12px;font-weight:700}.studenthdr>div,.studentmain>div{padding:7px 8px;border-right:1px solid var(--b)}.studenthdr>div:last-child,.studentmain>div:last-child{border-right:0}.studentgroup{border-top:1px solid var(--b)}.studentgroup:first-of-type{border-top:0}.studentmain{background:#fff}.studentmain .serialcell,.studentmain .idcell{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:600;overflow-wrap:anywhere}.studentmain .namecell{min-width:0;white-space:normal;overflow-wrap:anywhere}.studentmain .studentname{font-weight:700;line-height:1.25}.studentmain .rowmeta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px}.studentdetail{border-top:1px solid var(--b);background:#f8fafc;padding:7px 8px 9px}.datastrip{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;padding:1px 1px 4px;scrollbar-width:thin}.weekmini{flex:0 0 112px;border:1px solid var(--b);border-radius:6px;padding:6px;background:#fff}.scoremini{flex:0 0 158px;border:1px solid var(--b);border-radius:6px;padding:6px;background:#fff}.weekmini .celllabel,.scoremini .celllabel{font-size:11px;font-weight:700;color:var(--m);margin-bottom:5px;white-space:normal;line-height:1.15}.weekmini .s{width:100%;height:36px}.scoremini .scorebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px}.scoremini .scorebox input{width:100%;min-width:0}.scoremini.calc{background:#eef1f7}.scoremini.calc .calcvalue{font-weight:700;font-size:17px;padding:7px 2px;text-align:center}.statusinline{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.statusinline select{max-width:210px;padding:5px 7px;font-size:12px}.emptyresults{padding:24px;text-align:center;color:var(--m)}
-@media(max-width:520px){.studenthdr,.studentmain{grid-template-columns:62px 106px minmax(0,1fr)}.studenthdr>div,.studentmain>div{padding:6px 5px}.studentmain .studentname{font-size:14px}.studentmain .rowmeta{gap:4px}.studentmain .badge,.studentmain .warnbtn{font-size:10px;padding:3px 5px}.weekmini{flex-basis:104px}.scoremini{flex-basis:148px}.searchbar input{min-width:0;width:100%}}
+  /* ---- cloud sync ---- */
+  .cloud-pill{display:none;align-items:center;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+  .cloud-pill.synced{color:#7ef0b0;border-color:rgba(126,240,176,.35)}
+  .cloud-pill.saving,.cloud-pill.connecting{color:#ffe79d;border-color:rgba(255,231,157,.35)}
+  .cloud-pill.offline,.cloud-pill.error{color:#ff9b9b;border-color:rgba(255,155,155,.4)}
+  #cloudBanner{display:none;margin-bottom:10px;padding:12px 14px;border-radius:14px;border:1px solid #7a2e2e;background:#3a1717;color:#ffc9c9;font-weight:700;font-size:13px}
+  .login-overlay{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 15% 0%, rgba(109,168,255,.14), transparent 28%),var(--bg)}
+  body.cloud-locked .login-overlay{display:flex}
+  .login-card{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow)}
+  .login-card h2{margin:14px 0 6px;font-size:22px}
+  .login-card p{margin:0 0 16px;color:var(--muted);font-size:14px;line-height:1.45}
+  .login-card .field{margin-bottom:12px}
+  #loginError{display:none;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#3a1717;border:1px solid #7a2e2e;color:#ffc9c9;font-size:13px;font-weight:700}
+  #loginBtn{width:100%;justify-content:center}
+  #loginPin{text-align:center;font-size:22px;letter-spacing:.35em}
+  /* ---- question pictures ---- */
+  .q-img{display:block;max-width:100%;max-height:42vh;margin:14px auto 0;border-radius:14px;border:1px solid var(--line);background:#fff;object-fit:contain;cursor:zoom-in}
+  .q-img-loading{margin-top:14px;padding:18px;border-radius:14px;border:1px dashed var(--line);color:var(--muted);text-align:center;font-size:13px}
+  .q-thumb{display:block;max-width:150px;max-height:110px;margin-top:8px;border-radius:10px;border:1px solid var(--line);background:#fff;object-fit:contain;cursor:zoom-in}
+  .lightbox{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.93);padding:10px;cursor:zoom-out}
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}
 
-/* v15 hybrid roster layout: Design D identity row + synchronized Design B strip + Design A grade cells */
-.studenttable{border:1px solid var(--b);border-radius:6px;overflow:hidden;background:var(--c)}
-.studenthdr,.studentmain{display:grid;grid-template-columns:76px 132px minmax(0,1fr);align-items:stretch}
-.studenthdr{background:#e8ecf3;color:var(--t);font-size:12px;font-weight:700}
-.studenthdr>div,.studentmain>div{padding:6px 8px;border-right:1px solid var(--b)}
-.studenthdr>div:last-child,.studentmain>div:last-child{border-right:0}
-.studentgroup{border-top:1px solid var(--b);background:#fff}.studentgroup:first-of-type{border-top:0}
-.studentmain{background:#fff;min-height:46px}.studentmain .serialcell,.studentmain .idcell{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:600;overflow-wrap:anywhere}
-.studentmain .namecell{min-width:0;white-space:normal;overflow-wrap:anywhere;display:flex;flex-direction:column;justify-content:center}
-.studentmain .studentname{font-weight:700;line-height:1.2}.studentmain .rowmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:3px;color:var(--m);font-size:11px}
-.studentmain .rowmeta .badge{background:transparent;padding:0;border-radius:0;font-size:11px}.studentmain .rowmeta .badge.blue{color:#1d4ed8}.studentmain .rowmeta .badge.warn{color:#8a5b00}
-.studentdetail{border-top:1px solid var(--b);background:#f8fafc;padding:0}
-.syncstrip{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;touch-action:pan-x pan-y;background:#f8fafc}
-.syncinner{display:flex;min-width:max-content;align-items:stretch}
-.attcell{flex:0 0 128px;min-height:47px;border-right:1px solid var(--b);display:grid;grid-template-columns:minmax(0,1fr) 42px;align-items:center;padding:4px 6px;gap:5px;background:#fff}
-.attcell:last-child,.gradecell:last-child{border-right:0}.attlabel{min-width:0;font-size:11px;font-weight:700;color:var(--m);line-height:1.15}.attlabel .weekdate{margin-top:2px;font-size:9px}
-.attcell .s{width:40px;height:34px;font-size:15px}.attcell .lockmini{grid-column:1/-1;padding:2px 4px;font-size:9px;width:100%;margin-top:-1px}
-.gradecell{flex:0 0 164px;min-height:64px;border-right:1px solid var(--b);padding:5px 7px;background:#fff;display:flex;flex-direction:column;justify-content:center}
-.gradecell.calc{background:#eef1f7}.gradehead{font-size:11px;font-weight:700;color:var(--m);line-height:1.15;margin-bottom:5px;white-space:normal}
-.gradecell .scorebox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px}.gradecell .scorebox input{width:100%;min-width:0;height:32px;border-radius:4px;padding:4px 5px}
-.gradecell .absbtn{height:32px;border-radius:4px}.gradecell .calcvalue{font-weight:700;font-size:17px;min-height:32px;display:flex;align-items:center;justify-content:center}
-.statusinline select{max-width:210px;padding:3px 6px;font-size:11px}.scrollhint{font-size:11px;color:var(--m);margin-top:5px}
-@media(max-width:520px){.studenthdr,.studentmain{grid-template-columns:58px 104px minmax(0,1fr)}.studenthdr>div,.studentmain>div{padding:5px 4px}.studentmain .studentname{font-size:13px}.studentmain .rowmeta{gap:5px;font-size:10px}.studentmain .rowmeta .badge{font-size:10px}.attcell{flex-basis:116px}.gradecell{flex-basis:152px}.searchbar input{min-width:0;width:100%}}
+  /* ---- funny answer animations ---- */
+  #funStage{position:fixed;inset:0;z-index:450;display:none;flex-direction:column;align-items:center;justify-content:flex-end;background:rgba(5,9,20,.84);overflow:hidden;cursor:pointer}
+  #funStage.show{display:flex}
+  .fun-cap{position:absolute;top:8%;left:0;right:0;text-align:center;padding:0 16px;font-weight:900;font-size:clamp(26px,8vw,48px);color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.6);animation:funPop .6s ease-out}
+  .fun-sub{display:block;margin-top:8px;font-size:clamp(16px,4.5vw,24px);color:#7ef0b0}
+  .fun-sub.bad{color:#ffb3b3}
+  .fun-char{width:min(78vw,340px);margin-bottom:6vh}
+  .fun-char svg{width:100%;height:auto;overflow:visible}
+  .fun-note{position:absolute;top:-70px;width:64px;height:30px;border-radius:5px;background:#3fbf6f;border:2px solid #1d7a43;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 3px rgba(255,255,255,.25);animation:funFall linear forwards}
+  @keyframes funFall{to{transform:translate(var(--dx),115vh) rotate(var(--r))}}
+  @keyframes funPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  .f-bounce{animation:fBounce .7s ease-in-out infinite}
+  .f-slip{animation:fSlip 1.6s ease-in forwards}
+  .f-al{animation:fAL .6s ease-in-out infinite}
+  .f-ar{animation:fAR .6s ease-in-out infinite}
+  .f-ll{animation:fLL .6s ease-in-out infinite}
+  .f-lr{animation:fLR .6s ease-in-out infinite}
+  .f-wob{animation:fWob .5s ease-in-out infinite}
+  .f-smoke{animation:fSmoke 1.2s ease-out infinite}
+  .f-tear{animation:fTear 1s ease-in infinite}
+  @keyframes fBounce{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-16px) rotate(5deg)}}
+  @keyframes fSlip{0%{transform:rotate(0)}35%{transform:translateY(-34px) rotate(-18deg)}100%{transform:translateY(8px) rotate(-88deg)}}
+  @keyframes fAL{0%,100%{transform:rotate(15deg)}50%{transform:rotate(155deg)}}
+  @keyframes fAR{0%,100%{transform:rotate(-155deg)}50%{transform:rotate(-15deg)}}
+  @keyframes fLL{0%,100%{transform:rotate(-16deg)}50%{transform:rotate(16deg)}}
+  @keyframes fLR{0%,100%{transform:rotate(16deg)}50%{transform:rotate(-16deg)}}
+  @keyframes fWob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+  @keyframes fSmoke{0%{transform:translateY(0) scale(.4);opacity:.9}100%{transform:translateY(-50px) scale(1.4);opacity:0}}
+  @keyframes fTear{0%{transform:translateY(0);opacity:1}100%{transform:translateY(40px);opacity:0}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="storageWarn" style="display:none;margin-bottom:10px;padding:12px 14px;border-radius:14px;border:1px solid #6a5517;background:#3a2e10;color:#ffe79d;font-weight:700;font-size:13px">
+    ⚠ This browser is blocking saving. Your labs and questions work now, but they will disappear when you close this page. Open this file in Chrome to keep them.
+  </div>
+  <div id="cloudBanner"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">$</div>
+      <div><h1>Lab Cash Challenge</h1><p>Answer correctly. Build your lab bank.</p></div>
+    </div>
+    <div class="top-actions">
+      <span id="cloudPill" class="cloud-pill"></span>
+      <button class="btn primary" onclick="openManageModal()">Instructor Tools</button>
+    </div>
+  </header>
 
-/* v15 visual refinement: Design-D cleanliness, no cell/header outlines */
-.studenttable{border:1px solid var(--b);border-radius:9px;overflow:hidden;background:#fff}
-.studenthdr{background:#f1f4f8;border:0}
-.studenthdr>div,.studentmain>div{border-right:0!important}
-.studenthdr>div{padding:7px 10px;color:#344054}
-.studentgroup{border-top:1px solid #e2e6ec;background:#fff}
-.studentgroup:first-of-type{border-top:0}
-.studentmain{background:#fff;min-height:48px}
-.studentmain>div{padding:8px 10px}
-.studentdetail{border-top:1px solid #edf0f4;background:#fafbfc;padding:0}
-.syncstrip{background:#fafbfc}
-.syncinner{gap:0;padding:3px 8px 5px}
-.attcell{flex:0 0 120px;min-height:58px;border:0!important;background:transparent;padding:6px 8px;column-gap:8px}
-.attcell .lockmini{background:transparent!important;color:var(--m)!important;border:0!important;border-radius:0!important;padding:1px 2px!important;width:auto!important;justify-self:start;margin-top:0;text-decoration:none}
-.attcell .s{box-shadow:none}
-.gradecell{flex:0 0 158px;min-height:68px;border:0!important;background:transparent;padding:7px 10px}
-.gradecell.calc{background:transparent}
-.gradecell+.gradecell,.attcell+.attcell{margin-left:6px}
-.gradehead{margin-bottom:6px}
-.gradecell .scorebox input{background:#fff}
-.studentmain .rowmeta{margin-top:4px}
-@media(max-width:520px){
- .studenthdr>div,.studentmain>div{padding:6px 6px}
- .attcell{flex-basis:112px;padding:5px 6px}
- .gradecell{flex-basis:148px;padding:6px 7px}
- .syncinner{padding-left:5px;padding-right:5px}
-}
+  <div class="tabbar">
+    <button id="navGame" class="tabbtn active" onclick="showView('game')">🎮 Game</button>
+    <button id="navScores" class="tabbtn" onclick="showView('scores')">🏆 Live Score</button>
+  </div>
 
+  <div class="layout">
+    <main class="panel main">
+      <section id="gameView">
+        <div class="hero">
+          <div>
+            <div class="inline">
+              <span class="badge">CURRENT LAB</span>
+              <span id="roundBadge" class="badge">Group Round 1</span>
+            </div>
+            <h2 id="labTitle">Lab 1</h2>
+            <p id="labSub">Choose a student, then let them pick a mystery dollar card.</p>
+            <div class="lab-switcher">
+              <label for="labSelector">Choose / open a lab</label>
+              <select id="labSelector" onchange="switchLab(this.value)"></select>
+            </div>
+            <button class="btn gold restart-inline" onclick="restartBoard()">↻ Restart for New Group</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><b id="statQuestions">0</b><span>Questions</span></div>
+            <div class="stat"><b id="statRemaining">0</b><span>Remaining</span></div>
+            <div class="stat"><b id="statStudents">0</b><span>Students</span></div>
+          </div>
+        </div>
 
-/* v19: Hybrid 5 panel + universal attendance search + serial-first grading scope */
-.att-h5{padding:12px 14px 14px}.att-h5-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.att-h5-lab{flex:1;min-width:0}.att-h5-labselect{border:0!important;background:transparent!important;padding:0!important;border-radius:0!important;font-size:18px;font-weight:800;color:var(--t);width:auto;max-width:100%;box-shadow:none!important}.att-h5-place{display:flex;align-items:center;gap:6px;margin-top:5px;color:var(--m);font-size:12px}.att-h5-place input{border:0!important;border-bottom:1px solid #d9dee7!important;border-radius:0!important;padding:2px 3px!important;background:transparent!important;min-width:70px;max-width:180px;color:var(--m)}.att-h5-labtools{display:flex;gap:6px;flex:0 0 auto}.att-h5-icon{width:36px;height:36px;padding:0!important;border-radius:10px!important;background:#eef1f6!important;color:var(--t)!important;font-size:19px;display:grid;place-items:center}.att-h5-icon.danger{background:#fff0ef!important;color:var(--r)!important}.att-h5-session{margin-top:13px;background:#fff;border-radius:15px;box-shadow:0 5px 18px rgba(28,44,82,.08);overflow:hidden;border:1px solid #e4e8ef}.att-h5-session-title{background:#f0f3fb;padding:10px 13px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:800}.att-h5-session-body{padding:11px 13px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:9px;align-items:end}.att-h5-session-body label{margin:0}.att-h5-session-body select,.att-h5-session-body input{width:100%;margin-top:4px}.att-h5-actions{display:flex;gap:8px;flex-wrap:wrap;margin:11px 0 0}.att-h5-actions button{min-height:40px}.att-h5-actions .grow{flex:1;min-width:150px}.att-h5-policy{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.att-h5 .searchbar{padding-top:12px;margin-top:12px;border-top:1px solid #edf0f4}.att-h5-tools{padding-top:11px;margin-top:11px;border-top:1px solid #edf0f4}.att-h5-tools summary{cursor:pointer;color:var(--t);font-weight:700;list-style:none;display:flex;align-items:center;gap:7px}.att-h5-tools summary::-webkit-details-marker{display:none}.att-h5-tools summary:after{content:'⌄';color:var(--m);font-size:14px}.att-h5-tools[open] summary:after{content:'⌃'}.att-h5-tools .row{margin-bottom:0}
-@media(max-width:520px){.att-h5{padding:11px 12px 13px}.att-h5-labselect{font-size:17px}.att-h5-session-body{grid-template-columns:1fr 1fr}.att-h5-session-body .weeklock{grid-column:1/-1}.att-h5-icon{width:34px;height:34px}.att-h5-actions .grow{min-width:130px}}
+        <div class="active-student" id="activeStudentBox">
+          <span>Active student</span>
+          <b>No student selected</b>
+          <span>Select a student before opening a card.</span>
+        </div>
 
-/* v16: compact Design-D attendance, Design-A grading cells, GPU-synced detail rows */
-:root{--detail-shift:0px}
-.syncstrip{overflow:hidden!important;overscroll-behavior:none;touch-action:pan-y;cursor:grab;background:#fafbfc;-webkit-user-select:none;user-select:none}
-.syncstrip.dragging{cursor:grabbing}
-.syncinner{display:flex;min-width:max-content;align-items:stretch;transform:translate3d(var(--detail-shift),0,0);will-change:transform;backface-visibility:hidden}
-.studentdetail{border-top:1px dashed #d8dee8;background:#fafbfc}
-.syncinner{padding:2px 8px 4px;gap:0}
-.attcell{flex:0 0 78px!important;min-height:42px!important;border:0!important;background:transparent!important;padding:0!important;margin:0!important;display:flex!important;align-items:center;justify-content:center}
-.attplain{width:100%;min-height:40px;padding:6px 3px!important;border:0!important;border-radius:0!important;background:transparent!important;color:var(--t)!important;display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;white-space:nowrap;box-shadow:none!important}
-.attplain .attweek{font-weight:500;color:#344054}.attplain .attmark{font-size:17px;font-weight:800;line-height:1;color:var(--m)}
-.attplain.P .attmark{color:var(--g)}.attplain.A .attmark{color:var(--r)}.attplain.X .attmark{color:#1d4ed8}.attplain:disabled{opacity:.58}
-.attplain:focus-visible{outline:2px solid #9db0ff;outline-offset:-2px;border-radius:4px!important}
-.gradecell{flex:0 0 108px!important;min-height:62px!important;border:0!important;background:transparent!important;padding:5px 6px!important;margin:0!important;display:flex;flex-direction:column;justify-content:center}
-.gradecell.calc{flex-basis:88px!important;background:transparent!important}.gradecell+.gradecell,.attcell+.attcell{margin-left:0!important}
-.gradehead{font-size:10.5px;font-weight:700;color:var(--m);line-height:1.12;margin:0 0 5px;white-space:normal}
-.gradecell .scorebox{display:grid!important;grid-template-columns:54px 34px!important;gap:4px!important;justify-content:start;align-items:center}
-.gradecell .scorebox input{width:54px!important;min-width:54px!important;height:31px!important;padding:4px!important;text-align:center;border-radius:6px;background:#fff}
-.gradecell .absbtn{width:34px;height:31px!important;padding:0!important;border-radius:6px;font-size:9px}.gradecell .calcvalue{min-height:31px;font-size:16px;justify-content:flex-start;padding-left:2px}
-.focuspanel.gradefocus{max-width:760px;min-height:100dvh;padding-bottom:0}
-.focuscard.gradeidentity{margin:0;padding:16px 18px;border-radius:14px;box-shadow:0 5px 18px #14213d12}.focuscard.gradeidentity .focusid{font-size:clamp(25px,7vw,46px)}.focuscard.gradeidentity .focusname{font-size:clamp(20px,5vw,32px);margin-top:8px}
-.focusgradeconsole{position:sticky;bottom:0;z-index:3;margin-top:auto;background:#f8fafc;border:1px solid var(--b);border-bottom:0;border-radius:18px 18px 0 0;padding:12px;box-shadow:0 -10px 28px #14213d18}
-.focusgradedisplayrow{display:flex;align-items:center;gap:10px;margin-bottom:10px}.focusgradedisplaywrap{flex:1;min-width:0}.focusgradedisplaylabel{font-size:11px;color:var(--m);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
-.focusgradedisplay{height:62px;display:flex;align-items:center;justify-content:flex-end;padding:0 16px;border:2px solid #cfd6e2;border-radius:12px;background:#fff;font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;overflow:hidden}.focusgrademax{flex:0 0 auto;border-radius:999px;background:#eef1f7;padding:7px 10px;color:var(--m);font-weight:700}
-.focusgradework{display:block}.focuskeypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.focuskeypad button{min-height:54px;background:#fff;color:var(--t);border:1px solid #cfd6e2;border-radius:11px;font-size:23px;font-weight:750;padding:4px;box-shadow:0 1px 2px #14213d12}.focuskeypad button:active{transform:translateY(1px);background:#f1f4f8}.focuskeypad .fraction{background:#eef2ff;color:var(--p);border-color:#d8def8;font-size:21px;font-weight:850}.focuskeypad .entryclear{background:#fff1ef;color:var(--r);border-color:#f1c7c3;font-size:18px}.focuskeypad .softkey{background:#eef1f7}
-.focusgradeprimary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;margin-bottom:8px}.focusgradeprimary button{min-height:52px;font-size:16px;font-weight:800}.focusgradeprimary .absent{background:var(--r)}
-.focusgradeutility{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.focusgradeutility button{min-height:44px;background:#e3e8f0;color:var(--t);font-weight:700}.focusgradeutility .clear{color:var(--r);background:#fff;border:1px solid #f1c7c3}.focusgradehint{text-align:center;color:var(--m);font-size:11px;margin-top:8px}
-@media(max-width:520px){.syncinner{padding-left:4px;padding-right:4px}.attcell{flex-basis:72px!important}.gradecell{flex-basis:101px!important;padding-left:4px!important;padding-right:4px!important}.gradecell.calc{flex-basis:82px!important}.focuspanel.gradefocus{padding:8px 8px 0;gap:8px}.focusgradeconsole{margin-left:-8px;margin-right:-8px;padding:10px;border-radius:16px 16px 0 0}.focusgradedisplay{height:54px;font-size:30px}.focuskeypad button{min-height:50px;font-size:21px}.focuskeypad .fraction{font-size:20px}.focusgradeprimary button{min-height:48px;font-size:14px}.focusgradeutility button{min-height:42px;padding:5px;font-size:12px}}
-/* v19: universal attendance search + explicit grading scope */
-.externalresults{margin-top:12px;background:#fff;border:1px solid var(--b);border-radius:8px;overflow:hidden}.externalresults-title{padding:10px 12px;background:#f6f8fb;border-bottom:1px solid #e7ebf1;font-weight:700}.externalstudent{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 12px;border-bottom:1px solid #edf0f4}.externalstudent:last-child{border-bottom:0}.externalstudent-name{font-weight:700}.externalstudent-meta{font-size:12px;color:var(--m);margin-top:3px}.externalstudent-action{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.scopebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.scopebar>label{display:flex;align-items:center;gap:7px;margin:0;color:var(--m);font-size:13px}.scopebar>label select{margin:0;width:auto;min-width:140px}.scopehint{font-size:12px;color:var(--m)}
-@media(max-width:520px){.externalstudent{grid-template-columns:1fr}.externalstudent-action{justify-content:flex-start}.scopebar>label{width:100%;justify-content:space-between}.scopebar>label select{flex:1;max-width:220px}}
+        <div id="cards" class="cards"></div>
+        <div id="emptyBoard" class="empty" style="display:none">No questions in this lab yet. Use Instructor Tools to add some.</div>
+      </section>
 
-/* v24: Concept-B focus grading keypad with quarter-step shortcuts; retains v23 QR attendance */
-.qrscanov{position:fixed;inset:0;background:#000;z-index:45;overflow:hidden;color:#fff}.qrscanpanel{height:100dvh;width:100%;max-width:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;position:relative;overflow:hidden}.qrview{position:absolute;inset:0;background:#000;overflow:hidden;z-index:0}.qrview #qr-reader{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:100%!important;border:0!important;background:#000!important}.qrview #qr-reader video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;object-fit:cover!important}.qrview #qr-reader canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}.qrguide{display:none!important}.qrscanhead{position:relative;z-index:3;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:linear-gradient(#000c,#0000)}.qrscanhead .grow{flex:1;min-width:0}.qrscanhead h2{margin:0;font-size:20px}.qrscanmeta{font-size:12px;color:#e2e8f0;margin-top:2px}.qrscanclose{background:#111827cc;color:#fff;border:1px solid #ffffff33;backdrop-filter:blur(8px)}.qrcount{position:relative;z-index:3;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#e2e8f0;font-size:12px;padding:4px 12px 10px;text-shadow:0 1px 3px #000;background:linear-gradient(#0007,#0000)}.qrcount b{color:#fff;font-size:15px}.qrscanhelp{position:relative;z-index:3;margin-top:auto;padding:8px 14px 6px;text-align:center;font-size:12px;color:#e2e8f0;text-shadow:0 1px 3px #000;background:linear-gradient(#0000,#0009)}.qrstatus{position:relative;z-index:3;margin:0 10px calc(10px + env(safe-area-inset-bottom));background:#fffffff2;color:var(--t);border-radius:16px;padding:12px;min-height:96px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 28px #0008;backdrop-filter:blur(10px)}.qrstatusicon{width:46px;height:46px;flex:0 0 46px;border-radius:999px;display:grid;place-items:center;background:#eef1f7;font-size:24px;font-weight:800}.qrstatus.ok .qrstatusicon{background:#d1fadf;color:var(--g)}.qrstatus.warn .qrstatusicon{background:#fff3cd;color:#8a5b00}.qrstatus.err .qrstatusicon{background:#fee4e2;color:var(--r)}.qrstatustext{min-width:0;flex:1}.qrstatustext b{display:block;font-size:17px;line-height:1.2}.qrstatustext span{display:block;color:var(--m);font-size:13px;margin-top:4px;overflow-wrap:anywhere}.qrretry{background:#fff;color:var(--t);border:1px solid #cfd6e2}.qrprintov{position:fixed;inset:0;background:var(--bg);z-index:44;overflow:auto}.qrprintpanel{max-width:980px;margin:auto;padding:14px}.qrprinthead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}.qrprinthead h2{margin:0 auto 0 0}.qrprintgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.qrprintitem{background:#fff;border:1px solid var(--b);border-radius:8px;padding:10px;display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}.qrsticker{width:25mm;height:25mm;padding:3.5mm;background:#fff;display:grid;place-items:center;flex:0 0 auto}.qrsticker>div{width:18mm;height:18mm}.qrsticker canvas,.qrsticker img{display:block!important;width:18mm!important;height:18mm!important;image-rendering:pixelated}.qrprintwho{min-width:0}.qrprintwho b,.qrprintwho span{display:block}.qrprintwho b{font-size:13px}.qrprintwho span{font-size:11px;color:var(--m);margin-top:2px;overflow-wrap:anywhere}.qrprintnote{font-size:12px;color:var(--m);margin:0 0 10px}.qrprintscope{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.qrprintscope select{width:auto;min-width:150px}
-@media(max-width:520px){.qrstatus{padding:10px;min-height:92px}.qrcount{font-size:11px}.qrcount span:first-child{max-width:68%}.qrprintgrid{grid-template-columns:1fr}.qrprintitem{grid-template-columns:auto minmax(0,1fr)}}
-@page{size:A4;margin:10mm}@media print{body.qrprinting #app,body.qrprinting #modal>.qrprintov .qrprinthead,body.qrprinting #modal>.qrprintov .qrprintnote{display:none!important}body.qrprinting #modal>.qrprintov{position:static!important;background:#fff!important;overflow:visible!important}body.qrprinting #modal>.qrprintov .qrprintpanel{max-width:none!important;padding:0!important}body.qrprinting #modal>.qrprintov .qrprintgrid{display:grid!important;grid-template-columns:repeat(6,25mm)!important;gap:4mm!important;justify-content:start!important}body.qrprinting #modal>.qrprintov .qrprintitem{display:block!important;border:0!important;padding:0!important;border-radius:0!important;break-inside:avoid!important}.qrprintwho{display:none!important}.qrsticker{box-sizing:border-box!important;width:25mm!important;height:25mm!important;padding:3.5mm!important;background:#fff!important}.qrsticker>div{width:18mm!important;height:18mm!important}.qrsticker canvas,.qrsticker img{width:18mm!important;height:18mm!important;max-width:none!important;max-height:none!important}}
-.focusov{position:fixed;inset:0;background:var(--bg);z-index:30;overflow:auto}
-.focuspanel{min-height:100%;max-width:860px;margin:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-.focushead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.focushead .grow{flex:1}.focushead h2{margin:0}.focushead .m{display:block;margin-top:2px}
-.focusprogress{height:8px;background:#dfe4ec;border-radius:999px;overflow:hidden}.focusprogress>span{display:block;height:100%;background:var(--p);transition:width .18s ease}
-.focuscard{background:var(--c);border:1px solid var(--b);border-radius:18px;padding:clamp(20px,5vw,42px);box-shadow:0 12px 30px #14213d18;text-align:center;margin:auto 0}
-.focusserial{font-size:14px;color:var(--m);margin-bottom:8px}.focusid{font-size:clamp(28px,8vw,62px);font-weight:800;letter-spacing:.02em;line-height:1.05;word-break:break-word}.focusname{font-size:clamp(24px,6vw,44px);font-weight:700;line-height:1.12;margin-top:14px}.focusmeta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}.focusstatus{margin:18px auto 0;font-weight:700;min-height:22px}
-.focusactions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}.focusactions button{min-height:82px;font-size:clamp(19px,4vw,26px);font-weight:700}.focusactions .present{background:var(--g)}.focusactions .absent{background:var(--r)}
-.focusgrade{max-width:420px;margin:22px auto 0}.focusgrade input{width:100%;font-size:clamp(34px,9vw,58px);font-weight:700;text-align:center;padding:16px;border-width:2px}.focusgrade .max{font-size:16px;color:var(--m);margin-top:6px}.focusgradeactions{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:12px}.focusgradeactions button{min-height:58px;font-size:18px;font-weight:700}.focusgradeactions .absent{background:var(--r)}
-.focusnav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:20px}.focusnav button{min-width:110px}.focusdone{padding:40px 12px;text-align:center}.focusdone .big{font-size:54px}.focusdone h2{font-size:32px;margin:8px 0}
-@media(max-width:520px){.focuspanel{padding:10px}.focuscard{border-radius:14px}.focusactions{grid-template-columns:1fr}.focusactions button{min-height:72px}.focusgradeactions{grid-template-columns:1fr}.focushead button{padding:8px 10px}}
+      <section id="scoresView" style="display:none">
+        <div class="hero">
+          <div><div class="inline"><span class="badge">LIVE</span><span class="badge" id="studentCountBadge">0 students</span></div><h2>Live Scoreboard</h2><p>Balances update immediately after each correct answer.</p></div>
+          <button class="btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
+        </div>
+        <p class="hold-hint">Press and hold a student to edit or remove them.</p>
+        <div id="bigScoreList" class="score-list" style="margin-top:12px"></div>
+      </section>
+    </main>
 
-.authwrap{min-height:100vh;display:grid;place-items:center;padding:18px}.authcard{width:100%;max-width:460px}.authbrand{text-align:center;margin-bottom:14px}.authbrand h1{margin:0;font-size:30px}.authbrand p{margin:5px 0 0;color:var(--m)}.authseg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#e3e8f0;padding:4px;border-radius:9px;margin:14px 0}.authseg button{background:transparent;color:var(--t);padding:8px}.authseg button.on{background:#fff;box-shadow:0 1px 4px #14213d1a}.authcard .wide{width:100%;margin-top:6px}.authlink{background:transparent;color:var(--p);padding:4px 0}.accountstate{text-align:center;padding:22px 12px}.accountstate .ico{font-size:48px;margin-bottom:8px}.accountstate h2{margin:0 0 8px}.insgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}.statbox{border:1px solid var(--b);border-radius:8px;padding:10px;text-align:center;background:#fff}.statbox b{display:block;font-size:24px}.status.pending{background:#fff3cd;color:#8a5b00}.status.approved{background:#d1fadf;color:var(--g)}.status.rejected{background:#fee4e2;color:var(--r)}.instructorrow{display:grid;grid-template-columns:minmax(170px,1.5fr) minmax(180px,1.5fr) 110px minmax(190px,auto);gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--b)}.instructorrow:last-child{border-bottom:0}.instructorrow .who{min-width:0}.instructorrow .who b,.instructorrow .who span{display:block;overflow:hidden;text-overflow:ellipsis}.rulesbox{white-space:pre-wrap;max-height:360px}
-@media(max-width:720px){.instructorrow{grid-template-columns:1fr}.instructorrow>div:nth-child(2){font-size:13px;color:var(--m)}.insgrid{grid-template-columns:1fr 1fr 1fr}}
+  </div>
+</div>
 
-.ov{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:9}.ov .card{width:100%;max-width:420px;max-height:90vh;overflow:auto;margin:0}
-pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
-.e{color:var(--r)}.m{color:var(--m);font-size:13px}
-</style></head><body>
-<div id="app"></div><div id="modal"></div>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<div class="modal-backdrop" id="studentModal">
+  <div class="modal">
+    <h3>Create Student Account</h3>
+    <p>Add the student name and ID before they play.</p>
+    <div class="form-grid">
+      <div class="field"><label>Student name</label><input id="studentName" placeholder="e.g. Mariam Ahmed"></div>
+      <div class="field"><label>Student ID</label><input id="studentId" placeholder="e.g. 2301045"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('studentModal')">Cancel</button>
+      <button class="btn primary" onclick="createStudent()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="pickStudentModal">
+  <div class="modal">
+    <h3>Select student</h3>
+    <div class="field">
+      <label for="pickSearch">Search by name or ID</label>
+      <input id="pickSearch" type="search" autocomplete="off" placeholder="Type a name or ID" oninput="renderPickList()" onkeydown="if(event.key==='Enter')pickFirstMatch()">
+    </div>
+    <div id="pickList" class="pick-list"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('pickStudentModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="manageModal">
+  <div class="modal">
+    <h3>Instructor Tools</h3>
+    <p>Select the lab you want to edit, then add or remove questions for that lab.</p>
+
+    <div class="manage-card" id="cloudCard" style="display:none">
+      <h4>Cloud sync</h4>
+      <p>This phone is unlocked. Labs, questions and student accounts are shared with every instructor.</p>
+      <div class="modal-actions" style="margin-top:10px"><button class="btn" onclick="cloudSignOut()">Lock this phone</button></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Edit a lab</h4>
+      <p>Choose exactly which lab you want to manage.</p>
+      <div class="field" style="margin-top:12px">
+        <label for="manageLabSelector">Lab to edit</label>
+        <select id="manageLabSelector" onchange="selectLabForEditing(this.value)"></select>
+      </div>
+    </div>
+
+    <div class="manage-card">
+      <div class="inline" style="justify-content:space-between">
+        <div>
+          <h4 style="margin-bottom:4px">My Labs</h4>
+          <p>All labs you create appear here. Tap Open to work on a lab.</p>
+        </div>
+        <span class="badge" id="manageLabCount">0 labs</span>
+      </div>
+      <div id="manageLabsList" class="manage-labs-list"></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Create a new lab</h4>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="field"><label>Lab name</label><input id="newLabName" placeholder="e.g. Lab 2"></div>
+        <div class="field"><label>Short note</label><input id="newLabNote" placeholder="e.g. Plant microscopy"></div>
+      </div>
+      <div class="modal-actions"><button class="btn primary" onclick="createLab()">+ Create Lab</button></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Add question</h4>
+      <div class="field" style="margin-top:12px">
+        <label for="questionLabSelector">Add this question to</label>
+        <select id="questionLabSelector" onchange="selectLabForEditing(this.value)"></select>
+      </div>
+      <p id="manageCurrentLab" style="margin-top:10px"></p>
+      <div class="field" style="margin-top:12px"><label>Question</label><textarea id="newQuestionText" placeholder="Type the question"></textarea></div>
+      <div class="field" style="margin-top:10px"><label>Dollar value</label><input id="newQuestionValue" type="number" min="1" step="1" placeholder="e.g. 5"></div>
+      <div class="field" style="margin-top:10px"><label for="newQuestionImage">Picture (optional)</label><input id="newQuestionImage" type="file" accept="image/*" onchange="pickNewQuestionImage(this)"><div id="newQuestionImagePreview"></div></div>
+      <div class="modal-actions"><button class="btn primary" onclick="addQuestion()">+ Add Question</button></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Current questions</h4>
+      <div id="manageQuestions"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('manageModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="accountModal">
+  <div class="modal">
+    <h3 id="accountTitle">Student Account</h3>
+    <p id="accountMeta"></p>
+    <div class="hero" style="padding:16px">
+      <div><span class="badge">BANK BALANCE</span><h2 id="accountBalance" style="margin-top:6px">$0</h2></div>
+      <div id="accountStats"></div>
+    </div>
+    <div class="manage-card">
+      <h4>Edit student</h4>
+      <p>Change the name, the ID, or the balance. A balance change is added to the history.</p>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="field"><label for="editStudentName">Student name</label><input id="editStudentName"></div>
+        <div class="field"><label for="editStudentId">Student ID</label><input id="editStudentId"></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label for="editStudentBalance">Bank balance ($)</label><input id="editStudentBalance" type="number" inputmode="numeric" min="0" step="1"></div>
+      <div class="modal-actions">
+        <button class="btn danger" onclick="deleteStudent(accountEditingId)">Delete student</button>
+        <button class="btn primary" onclick="saveStudentEdits()">Save changes</button>
+      </div>
+    </div>
+    <div class="section-title" style="margin-top:18px">Transaction History</div>
+    <div id="accountHistory"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('accountModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay-celebrate" id="celebration">
+  <div class="celebrate-center">🎉 CORRECT! 🎉<div id="celebrateCash" style="font-size:.38em;color:#86f3bb;margin-top:8px"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<input type="file" id="qImagePicker" accept="image/*" style="display:none" onchange="onQuestionImagePicked(this)">
+<div class="lightbox" id="lightbox" onclick="closeLightbox()"><img id="lightboxImg" alt="Question picture"></div>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="logo">$</div>
+    <div id="loginLoading"><h2>Lab Cash Challenge</h2><p id="loginLoadingText">Connecting…</p></div>
+    <div id="loginForm" style="display:none">
+      <h2>Instructor PIN</h2>
+      <p>Enter the PIN to load your labs and student accounts on this phone.</p>
+      <div class="field"><label for="loginPin">PIN</label><input id="loginPin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••"></div>
+      <div id="loginError"></div>
+      <button class="btn primary" id="loginBtn" onclick="cloudSignIn()">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const APP_VERSION='20.0';
-const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
-const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
-let S={tab:'att',lab:'',gl:'',aw:1,gfk:'',aq:'',gq:'',admin:false,cfg:null,labs:[],studs:[],user:null,profile:null,instructors:[]},db,auth,started=0,FO=null,unsubs=[],insUnsub=null,profileUnsub=null,signupBusy=false;
+const STORAGE_KEY = "labCashChallenge_v1";
 
-/* ---------- start-up, setup, account access ---------- */
-const CFG={apiKey:"AIzaSyAxgPrBcVszBieseQXfaz5JqcO_UAAopg0",authDomain:"labtrack-c55fb.firebaseapp.com",projectId:"labtrack-c55fb",storageBucket:"labtrack-c55fb.firebasestorage.app",messagingSenderId:"561200653207",appId:"1:561200653207:web:e7cb27d82c1b97e3575ad2"};
-const SEC_RULES=`rules_version = '2';
-service cloud.firestore {
- match /databases/{database}/documents {
-  function signedIn() { return request.auth != null; }
-  function admin() {
-   return signedIn()
-    && exists(/databases/$(database)/documents/cfg/main)
-    && request.auth.uid in get(/databases/$(database)/documents/cfg/main).data.admins;
-  }
-  function approved() {
-   return signedIn()
-    && exists(/databases/$(database)/documents/instructors/$(request.auth.uid))
-    && get(/databases/$(database)/documents/instructors/$(request.auth.uid)).data.approved == true
-    && get(/databases/$(database)/documents/instructors/$(request.auth.uid)).data.status == 'approved';
-  }
+const defaultState = {
+  currentLabId: "lab1",
+  activeStudentId: null,
+  labs: [
+    {
+      id:"lab1",
+      name:"Lab 1",
+      note:"Microscope basics",
+      round:1,
+      questions:[
+        {id:"q1", text:"Can anyone remind me how to use the microscope?", value:9, used:false},
+        {id:"q2", text:"Can anyone remind me how to prepare the slide for the microscope?", value:4, used:false}
+      ]
+    }
+  ],
+  students:[]
+};
 
-  match /instructors/{uid} {
-   allow get: if signedIn() && (request.auth.uid == uid || admin());
-   allow list: if admin();
-   allow create: if admin() || (signedIn() && request.auth.uid == uid
-    && request.resource.data.approved == false
-    && request.resource.data.status == 'pending'
-    && request.resource.data.role == 'instructor'
-    && request.resource.data.email == request.auth.token.email);
-   allow update, delete: if admin();
-  }
+let state = loadState();
+let activeQuestionId = null;
+let accountEditingId = null;
 
-  match /cfg/main {
-   allow get: if signedIn() && (!exists(/databases/$(database)/documents/cfg/main) || approved() || admin());
-   allow create: if signedIn() && !exists(/databases/$(database)/documents/cfg/main)
-    && request.resource.data.admins.size() == 1
-    && request.resource.data.admins[0] == request.auth.uid;
-   allow update: if admin() || (approved()
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['altLabLimit','absenceWarn']));
-  }
-  match /cfg/template {
-   allow read: if approved() || admin();
-   allow write: if admin();
-  }
-  match /labs/{id} { allow read, write: if approved() || admin(); }
-  match /students/{id} { allow read, write: if approved() || admin(); }
- }
-}`;
-const defaultCfg=uid=>({weeks:12,locked:{},items:DEF,admins:[uid],altLabLimit:2,absenceWarn:3});
-const ts=()=>firebase.firestore.FieldValue.serverTimestamp();
-function stopLive(){unsubs.splice(0).forEach(u=>{try{u()}catch(_){}});if(insUnsub){try{insUnsub()}catch(_){ }insUnsub=null}started=0;S.cfg=null;S.labs=[];S.studs=[];S.instructors=[]}
-function stopProfileWatch(){if(profileUnsub){try{profileUnsub()}catch(_){ }profileUnsub=null}}
-function boot(){const c=localStorage.fbc||JSON.stringify(CFG);
- try{firebase.initializeApp(JSON.parse(c));auth=firebase.auth();db=firebase.firestore()}catch(e){return setup('Config problem: '+e.message)}
- auth.onAuthStateChanged(async u=>{S.user=u||null;if(signupBusy)return;if(!u){stopLive();stopProfileWatch();S.profile=null;return login()}await gateUser(u)})}
-function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack setup</h2>
-<p class=m>1. In Firebase create a Web app and copy its firebaseConfig.<br>2. Authentication → Sign-in method: enable <b>Email/Password</b>. You do not need to add instructors under Firebase Users.<br>3. Firestore Database → Rules: paste the secure rules below and Publish. The first LabTrack account created in a new database becomes the admin; later accounts wait for admin approval.</p>
-<pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy security rules</button>
-<label>Paste your firebaseConfig here<textarea id=cfgt rows=7 style="width:100%"></textarea></label>
-<p class=e>${esc(err)}</p><button onclick=saveCfg()>Save and continue</button></div></main>`}
-function saveCfg(){const o={};for(const m of $('#cfgt').value.matchAll(/(\w+)\s*:\s*["']([^"']+)["']/g))o[m[1]]=m[2];
- if(!o.apiKey||!o.projectId)return setup('apiKey or projectId not found. Paste the whole config.');localStorage.fbc=JSON.stringify(o);location.reload()}
-async function copyRules(){try{await navigator.clipboard.writeText(SEC_RULES);alert('Security rules copied. Paste them in Firebase → Firestore Database → Rules and press Publish.')}catch(_){alert('Copy failed. Select the rules text and copy it manually.')}}
-function login(err='',mode='signin',note=''){$('#app').innerHTML=`<div class=authwrap><div class="card authcard"><div class=authbrand><h1>LabTrack</h1><p>Instructor access · v19</p></div>
-<div class=authseg><button class="${mode==='signin'?'on':''}" onclick="login('','signin')">Sign in</button><button class="${mode==='signup'?'on':''}" onclick="login('','signup')">Create account</button></div>
-${mode==='signup'?`<label>Full name<input id=nm autocomplete=name placeholder="Instructor name"></label><label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=new-password minlength=6></label><label>Confirm password<input id=pw2 type=password autocomplete=new-password minlength=6></label><button class=wide onclick=signUp()>Create LabTrack account</button><p class=m>Your account will remain pending until a LabTrack admin approves it.</p>`:mode==='forgot'?`<h3>Reset password</h3><label>Email<input id=em type=email autocomplete=email></label><button class=wide onclick=sendReset()>Send reset email</button><button class="authlink wide" onclick="login('','signin')">Back to sign in</button>`:`<label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=current-password onkeydown="if(event.key==='Enter')signIn()"></label><button class=wide onclick=signIn()>Sign in</button><button class="authlink wide" onclick="login('','forgot')">Forgot password?</button>`}
-${note?`<p class=m>${esc(note)}</p>`:''}${err?`<p class=e>${esc(err)}</p>`:''}<div style="margin-top:14px;text-align:center"><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div></div></div>`}
-function friendlyAuth(e){const c=e?.code||'',m={
- 'auth/email-already-in-use':'An account already exists with this email. Use Sign in instead.',
- 'auth/invalid-email':'Enter a valid email address.','auth/weak-password':'Use a password of at least 6 characters.',
- 'auth/invalid-credential':'Incorrect email or password.','auth/user-not-found':'Incorrect email or password.',
- 'auth/wrong-password':'Incorrect email or password.','auth/too-many-requests':'Too many attempts. Please wait and try again.'};return m[c]||e?.message||'Something went wrong.'}
-function signIn(){const em=$('#em')?.value.trim(),pw=$('#pw')?.value||'';if(!em||!pw)return login('Enter your email and password.','signin');auth.signInWithEmailAndPassword(em,pw).catch(e=>login(friendlyAuth(e),'signin'))}
-async function signUp(){const name=$('#nm')?.value.trim(),email=$('#em')?.value.trim().toLowerCase(),pw=$('#pw')?.value||'',pw2=$('#pw2')?.value||'';
- if(name.length<2)return login('Enter your full name.','signup');if(!email)return login('Enter your email address.','signup');if(pw.length<6)return login('Password must be at least 6 characters.','signup');if(pw!==pw2)return login('The two passwords do not match.','signup');
- signupBusy=true;let cred=null;try{cred=await auth.createUserWithEmailAndPassword(email,pw);try{await cred.user.updateProfile({displayName:name})}catch(_){}
-  const p={name,email,role:'instructor',approved:false,status:'pending',createdAt:ts()};await db.collection('instructors').doc(cred.user.uid).set(p);signupBusy=false;S.user=cred.user;await gateUser(cred.user)
- }catch(e){signupBusy=false;if(cred){try{await auth.signOut()}catch(_){}}login(friendlyAuth(e),'signup')}}
-async function sendReset(){const email=$('#em')?.value.trim();if(!email)return login('Enter your email address.','forgot');try{await auth.sendPasswordResetEmail(email);login('','signin','Password reset email sent.')}catch(e){login(friendlyAuth(e),'forgot')}}
-function loadingAccount(){$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⋯</div><h2>Checking your LabTrack account</h2><p class=m>Please wait.</p></div></div>`}
-function pendingScreen(){stopLive();const p=S.profile||{};$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⏳</div><h2>Awaiting approval</h2><p><b>${esc(p.name||S.user?.displayName||'Instructor')}</b></p><p class=m>${esc(p.email||S.user?.email||'')}</p><p>Your LabTrack account was created successfully. An administrator must approve it before you can access student data.</p><div class=row style="justify-content:center"><button onclick=refreshAccess()>Check again</button><button class=g onclick="auth.signOut()">Sign out</button></div></div></div>`}
-function rejectedScreen(){stopLive();const p=S.profile||{};$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⛔</div><h2>Account not approved</h2><p><b>${esc(p.name||S.user?.displayName||'Instructor')}</b></p><p class=m>${esc(p.email||S.user?.email||'')}</p><p>This LabTrack account is currently rejected. Contact the LabTrack administrator if access should be restored.</p><button class=g onclick="auth.signOut()">Sign out</button></div></div>`}
-async function refreshAccess(){if(S.user)await gateUser(S.user)}
-async function gateUser(u){loadingAccount();const ref=db.collection('instructors').doc(u.uid);try{
- let d=await ref.get(),p=d.exists?d.data():null;
- if(!p){let cfg=null;try{cfg=await db.doc('cfg/main').get()}catch(_){}
-  const legacyAdmin=cfg?.exists&&(cfg.data().admins||[]).includes(u.uid);
-  p={name:u.displayName||u.email?.split('@')[0]||'Instructor',email:u.email||'',role:legacyAdmin?'admin':'instructor',approved:!!legacyAdmin,status:legacyAdmin?'approved':'pending',createdAt:ts()};await ref.set(p,{merge:true});d=await ref.get();p=d.data()
- }
- // Brand-new database only: the first LabTrack registrant becomes administrator.
- if(!p.approved&&p.status!=='rejected')try{const c=await db.doc('cfg/main').get();if(!c.exists){await db.doc('cfg/main').set(defaultCfg(u.uid));await ref.set({approved:true,status:'approved',role:'admin',approvedAt:ts(),approvedBy:u.uid},{merge:true});d=await ref.get();p=d.data()}}catch(_){}
- S.profile={id:u.uid,...p};watchOwnProfile(ref);
- if(S.profile.approved===true&&S.profile.status==='approved')return start();
- return S.profile.status==='rejected'?rejectedScreen():pendingScreen()
- }catch(e){console.error(e);$('#app').innerHTML=`<div class=authwrap><div class="card authcard accountstate"><div class=ico>⚠</div><h2>Account check failed</h2><p class=e>${esc(friendlyAuth(e))}</p><p class=m>If you just upgraded LabTrack, publish the current Firestore security rules from the admin Settings page.</p><button class=g onclick="auth.signOut()">Sign out</button></div></div>`}}
-function watchOwnProfile(ref){stopProfileWatch();profileUnsub=ref.onSnapshot(d=>{if(!d.exists)return;const p={id:d.id,...d.data()},wasApproved=S.profile?.approved===true;S.profile=p;if(p.approved!==true||p.status!=='approved'){if(started)stopLive();return p.status==='rejected'?rejectedScreen():pendingScreen()}if(!started)start();else if(!wasApproved)render()},()=>{})}
-function watchInstructors(){if(S.admin&&!insUnsub){insUnsub=db.collection('instructors').onSnapshot(q=>{S.instructors=q.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==='ins')render()},e=>console.error(e))}else if(!S.admin&&insUnsub){try{insUnsub()}catch(_){}insUnsub=null;S.instructors=[];if(S.tab==='ins')S.tab='att'}}
-function start(){if(started)return;started=1;
- unsubs.push(db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set(defaultCfg(S.user.uid));S.cfg=d.data();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});if(S.aw>S.cfg.weeks)S.aw=S.cfg.weeks;watchInstructors();render()},e=>{console.error(e);alert(e.message)}));
- unsubs.push(db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));if(!S.labs.find(l=>l.id===S.lab))S.lab=S.labs[0]?.id||'';render()}));
- unsubs.push(db.collection('students').onSnapshot(q=>{S.studs=q.docs.map(d=>({_:d.id,...d.data()}));render()}))}
+function cloneState(o){ return JSON.parse(JSON.stringify(o)); }
 
-/* ---------- helpers ---------- */
-const serialCmp=(a,b)=>{const A=String(a.sn??'').trim(),B=String(b.sn??'').trim();if(!A&&!B){}else if(!A)return 1;else if(!B)return -1;else{const an=/^[+-]?\d+(?:\.\d+)?$/.test(A)?+A:null,bn=/^[+-]?\d+(?:\.\d+)?$/.test(B)?+B:null;if(an!==null&&bn!==null&&an!==bn)return an-bn;const c=A.localeCompare(B,undefined,{numeric:true,sensitivity:'base'});if(c)return c}const id=String(a.sid??'').localeCompare(String(b.sid??''),undefined,{numeric:true,sensitivity:'base'});return id||String(a.nm??'').localeCompare(String(b.nm??''),undefined,{numeric:true,sensitivity:'base'})};
-const LS=l=>S.studs.filter(s=>!l||s.lab===l).sort(serialCmp);
-const allBySerial=()=>[...S.studs].sort(serialCmp);
-const St=id=>db.collection('students').doc(id),Cf=()=>db.doc('cfg/main');
-const norm=x=>String(x??'').trim().toLowerCase(),labName=id=>S.labs.find(l=>l.id===id)?.name||'another lab';
-const attN=s=>rng(S.cfg.weeks).filter(w=>['P','X'].includes((s.att||{})[w])).length;
-const absN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='A').length;
-const altN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='X').length;
-const shortDate=d=>{if(!d)return'';const x=new Date(d+'T00:00:00');return isNaN(x)?d:x.toLocaleDateString(undefined,{month:'short',day:'numeric'})};
-const studentMatch=(s,q)=>{q=norm(q);return !q||norm(s.sn).includes(q)||norm(s.sid).includes(q)||norm(s.nm).includes(q)};
-const attStudents=()=>LS(S.lab).filter(s=>studentMatch(s,S.aq));
-const attendanceUniversalMatches=()=>S.aq?allBySerial().filter(s=>studentMatch(s,S.aq)):[];
-const gradeStudents=()=>focusList(S.gl).filter(s=>studentMatch(s,S.gq));
-function calc(s){const m={},it=S.cfg.items,g=s.g||{};
- const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
-  if(i.t=='in'){const q=g[k];r=q==='Abs'?0:q===undefined||q===''||isNaN(+q)?null:+q}
-  else if(i.t=='att'){const p=attN(s),b=absN(s);r=i.mode=='pen'?Math.max(0,i.max-b*i.pen):p/S.cfg.weeks*i.max}
-  else if(i.t=='grp'){let xs=(i.src||[]).map(v).filter(x=>x!==null).sort((a,b)=>b-a);if(i.top>0)xs=xs.slice(0,i.top);if(xs.length){r=xs.reduce((a,b)=>a+b,0);if(i.agg=='avg')r/=xs.length;r*=i.mul}}
-  else if(i.t=='sum')r=(i.src||[]).reduce((a,k)=>a+(v(k)||0),0);
-  return m[k]=r===null?null:Math.round(r*100)/100};
- it.forEach(i=>v(i.k));return m}
-
-/* ---------- main view ---------- */
-function render(){if(!S.cfg||!S.user||S.profile?.approved!==true)return;const a=document.activeElement,f=a&&a.dataset&&a.dataset.f,ss=a&&typeof a.selectionStart==='number'?a.selectionStart:null,se=a&&typeof a.selectionEnd==='number'?a.selectionEnd:null;
- const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v24</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="auth.signOut()">Sign out</button></header>
-<nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
-<main>${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
- if(f){const e=document.querySelector(`[data-f="${f}"]`);if(e){e.focus();if(ss!==null&&typeof e.setSelectionRange==='function'){const L=String(e.value??'').length;e.setSelectionRange(Math.min(ss,L),Math.min(se??ss,L))}}}requestAnimationFrame(()=>applySyncedScroll())}
-
-
-let detailScrollX=0,detailScrollMax=0,syncDrag=null,syncPaintRaf=0,syncInertiaRaf=0,syncSuppressClickUntil=0;
-function detailMax(){const v=document.querySelector('.syncstrip'),i=v?.querySelector('.syncinner');return v&&i?Math.max(0,i.scrollWidth-v.clientWidth):0}
-function paintDetailScroll(){syncPaintRaf=0;document.documentElement.style.setProperty('--detail-shift',(-detailScrollX)+'px')}
-function setDetailScroll(x){detailScrollMax=detailMax();detailScrollX=Math.max(0,Math.min(detailScrollMax,Number.isFinite(x)?x:0));if(!syncPaintRaf)syncPaintRaf=requestAnimationFrame(paintDetailScroll)}
-function applySyncedScroll(){detailScrollMax=detailMax();detailScrollX=Math.min(detailScrollX,detailScrollMax);paintDetailScroll()}
-function stopSyncInertia(){if(syncInertiaRaf){cancelAnimationFrame(syncInertiaRaf);syncInertiaRaf=0}}
-// Delayed capture makes grading scroll like attendance: tap controls normally, drag anywhere horizontally.
-function syncDragStart(e,el){if(e.pointerType==='mouse'&&e.button!==0)return;stopSyncInertia();detailScrollMax=detailMax();syncDrag={id:e.pointerId,startX:e.clientX,startY:e.clientY,startScroll:detailScrollX,lastT:performance.now(),v:0,moved:false,captured:false,el,target:e.target}}
-function syncDragMove(e){if(!syncDrag||e.pointerId!==syncDrag.id)return;const dx=e.clientX-syncDrag.startX,dy=e.clientY-syncDrag.startY;if(!syncDrag.moved){if(Math.abs(dx)<5)return;if(Math.abs(dy)>Math.abs(dx)*1.2)return;syncDrag.moved=true;syncSuppressClickUntil=performance.now()+320;syncDrag.el?.classList.add('dragging');if(syncDrag.target?.blur)syncDrag.target.blur();try{syncDrag.el?.setPointerCapture(e.pointerId);syncDrag.captured=true}catch(_){}}if(e.cancelable)e.preventDefault();const now=performance.now(),dt=Math.max(1,now-syncDrag.lastT),next=Math.max(0,Math.min(detailScrollMax,syncDrag.startScroll-dx)),prev=detailScrollX;setDetailScroll(next);syncDrag.v=(next-prev)/dt;syncDrag.lastT=now}
-function syncDragEnd(e){if(!syncDrag||e.pointerId!==syncDrag.id)return;const d=syncDrag;d.el?.classList.remove('dragging');if(d.captured)try{d.el?.releasePointerCapture(e.pointerId)}catch(_){}syncDrag=null;if(d.moved){syncSuppressClickUntil=performance.now()+320;startSyncInertia(d.v)}}
-function startSyncInertia(v){stopSyncInertia();if(Math.abs(v)<.05)return;let last=performance.now();const step=t=>{const dt=Math.min(32,t-last);last=t;const before=detailScrollX;setDetailScroll(detailScrollX+v*dt);if(detailScrollX===0||detailScrollX===detailScrollMax||Math.abs(detailScrollX-before)<.05)v=0;v*=Math.pow(.91,dt/16.67);if(Math.abs(v)>.02)syncInertiaRaf=requestAnimationFrame(step);else syncInertiaRaf=0};syncInertiaRaf=requestAnimationFrame(step)}
-function syncWheel(e){const d=Math.abs(e.deltaX)>=Math.abs(e.deltaY)?e.deltaX:(e.shiftKey?e.deltaY:0);if(!d)return;if(e.cancelable)e.preventDefault();stopSyncInertia();setDetailScroll(detailScrollX+d)}
-function syncClickGuard(){return performance.now()<syncSuppressClickUntil}
-
-/* ---------- attendance ---------- */
-function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(0,+S.cfg.altLabLimit||0),thr=Math.max(0,+S.cfg.absenceWarn||0);
- if(!l)return `<div class="card att-h5"><div class=att-h5-head><div class=att-h5-lab><div style="font-size:18px;font-weight:800">No labs yet</div><div class=m style="margin-top:5px">Add your first lab to start attendance.</div></div><button class=att-h5-icon title="Add lab" onclick=addLab()>＋</button></div></div>`;
- const visitors=S.studs.filter(s=>s.lab!==l.id&&(s.att||{})[S.aw]=='X'&&(s.alt||{})[S.aw]===l.id).sort(serialCmp),all=LS(l.id),shown=attStudents(),universal=attendanceUniversalMatches(),foreign=(S.aq&&shown.length===0)?universal.filter(s=>s.lab!==l.id):[],flagged=all.filter(s=>absN(s)>thr).length,locked=!!S.cfg.locked?.[S.aw];
- const searchText=!S.aq?`Showing ${all.length}`:shown.length?`Showing ${shown.length} in ${l.name}`:foreign.length?`Found ${foreign.length} in other ${foreign.length===1?'lab':'labs'}`:'No students found';
- return `<div class="card att-h5"><div class=att-h5-head><div class=att-h5-lab><select class=att-h5-labselect onchange="S.lab=this.value;S.aq='';detailScrollX=0;render()">${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.lab?'selected':''}>${esc(x.name)}</option>`).join('')}</select><div class=att-h5-place><span>Place</span><input data-f=lp value="${esc(l.place)}" placeholder="Not set" onchange="db.doc('labs/${l.id}').update({place:this.value})"></div></div><div class=att-h5-labtools><button class=att-h5-icon title="Add lab" onclick=addLab()>＋</button><button class="att-h5-icon danger" title="Remove this lab" onclick=delLab()>×</button></div></div>
- <div class=att-h5-session><div class=att-h5-session-title><span>Attendance session</span><span class="badge ${locked?'warn':'blue'}">${locked?'Locked':'Unlocked'}</span></div><div class=att-h5-session-body><label>Session week<select onchange="S.aw=+this.value;render()">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label><label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>${S.admin?`<button class="g weeklock" onclick="lock(${S.aw})">${locked?'Unlock':'Lock'} Week ${S.aw}</button>`:'<span></span>'}</div></div>
- <div class=att-h5-actions><button class="g grow" onclick=startAttendanceFocus() ${locked&&!S.admin?'disabled':''}>Focus mode${S.aq?' · filtered':''}</button><button class=grow onclick=startQrAttendance() ${locked&&!S.admin?'disabled':''}>▣ Scan QR</button><button class=grow onclick=visitorModal() ${locked&&!S.admin?'disabled':''}>+ Visiting student</button>${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div><div class=att-h5-policy><span class="badge blue">Other-lab allowance: ${lim}</span><span class=badge>Warning after &gt; ${thr} absences</span></div>
- <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search all labs by serial, ID or name" oninput="S.aq=this.value;render()"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';render()">Clear</button>':''}</div>
- <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)"><button class=g onclick="$('#f1').click()">Sync SIS roster (.xls)</button><button class=g onclick="$('#f2').click()">Upload course serials</button><button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
- ${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${shown.map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class="namecell ${flag?'flagname':''}"><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class="badge blue">Att ${ac}</span>${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ Abs ${bc}</button>`:`<span class=badge>Abs ${bc}</span>`}<span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">Other ${xc}/${lim}</span></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${rng(W).map(w=>{const v=a[w]||'',title=(l.dates||{})[w]?`Week ${w} · ${shortDate((l.dates||{})[w])}`:`Week ${w}`,extra=v=='X'?` · Attended in ${labName((s.alt||{})[w])}`:'';return `<div class=attcell><button title="${esc(title+extra)}" class="attplain ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="if(syncClickGuard())return;mark('${s._}',${w},'${v}')"><span class=attweek>W${w}${S.cfg.locked?.[w]?' 🔒':''}</span><span class=attmark>${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</span></button></div>`}).join('')}</div></div></div></div>`}).join('')}</div>`:foreign.length?`<div class=externalresults><div class=externalresults-title>Student${foreign.length===1?'':'s'} found outside ${esc(l.name)}</div>${foreign.map(s=>`<div class=externalstudent><div><div class=externalstudent-name>${esc(s.nm||'Unnamed student')}</div><div class=externalstudent-meta>Serial ${esc(s.sn||'—')} · ID ${esc(s.sid||'—')}</div></div><div class=externalstudent-action><span class=badge>${esc(labName(s.lab))}</span><button onclick="goToAttendanceLab('${s.lab}')">Go to ${esc(labName(s.lab))}</button></div></div>`).join('')}</div>`:'<div class="card emptyresults">No students match your search in any lab.</div>'}`}
-
-function setWeekDate(w,v){if(S.lab)db.doc('labs/'+S.lab).update({['dates.'+w]:v})}
-function goToAttendanceLab(id){if(!S.labs.some(l=>l.id===id))return;S.lab=id;detailScrollX=0;render()}
-function mark(id,w,cur){let n=cur==''?'P':cur=='P'?'A':'';const u={['att.'+w]:n==''?FV():n,['alt.'+w]:FV()};St(id).update(u)}
-function lock(w){if(S.admin)Cf().update({['locked.'+w]:!S.cfg.locked?.[w]})}
-function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),place:'',dates:{}}).then(r=>{S.lab=r.id})}
-function delLab(){if(!confirm('Remove this lab and all its students?'))return;const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));b.commit()}
-function addSt(){const n=$('#a3').value.trim(),i=$('#a2').value.trim();if(!n&&!i)return;db.collection('students').add({lab:S.lab,sn:$('#a1').value.trim(),sid:i,nm:n,att:{},alt:{},g:{}})}
-function delSt(id){if(confirm('Remove this student?'))St(id).delete()}
-function visitorModal(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');const pool=S.studs.filter(s=>s.lab!==S.lab).sort((a,b)=>String(a.nm).localeCompare(String(b.nm)));
- if(!pool.length)return alert('There are no students in other labs.');$('#modal').innerHTML=`<div class=ov><div class=card><h3>Add visiting student</h3><p class=m>Week ${w}${(l.dates||{})[w]?' · '+esc(shortDate((l.dates||{})[w])):''} · attending ${esc(l.name)}</p><input id=vq placeholder="Search ID or name" oninput="filterVisitor(this.value)" style="width:100%"><label>Student<select id=vs size=8 style="height:220px">${pool.map(s=>`<option value="${s._}" data-q="${esc(norm((s.sid||'')+' '+(s.nm||'')+' '+labName(s.lab)))}">${esc(s.sid||'—')} — ${esc(s.nm)} — ${esc(labName(s.lab))}</option>`).join('')}</select></label><div class=row><button onclick=saveVisitor()>Mark attended here</button><button class=g onclick="$('#modal').innerHTML=''">Cancel</button></div></div></div>`}
-function filterVisitor(q){q=norm(q);[...document.querySelectorAll('#vs option')].forEach(o=>o.hidden=q&&!o.dataset.q.includes(q))}
-function saveVisitor(){const id=$('#vs')?.value,s=S.studs.find(x=>x._===id),w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0);if(!s)return alert('Choose a student.');const cur=(s.att||{})[w]||'',used=altN(s);if(cur!='X'&&used>=lim)return alert(`${s.nm} has already used ${used}/${lim} other-lab attendances.`);if(lim<1&&cur!='X')return alert('Other-lab attendance allowance is currently 0.');if(cur=='P'&&!confirm('This student is already marked present in the home lab for this week. Replace it with attendance in this lab?'))return;St(id).update({['att.'+w]:'X',['alt.'+w]:S.lab}).then(()=>{$('#modal').innerHTML=''})}
-function clearVisitor(id,w){if(S.cfg.locked?.[w]&&!S.admin)return;St(id).update({['att.'+w]:FV(),['alt.'+w]:FV()})}
-async function warnStudent(id){const s=S.studs.find(x=>x._===id);if(!s)return;const n=absN(s),t=Math.max(0,+S.cfg.absenceWarn||0),msg=`Attendance warning: ${s.nm}${s.sid?' ('+s.sid+')':''} has ${n} recorded absences, exceeding the course threshold of ${t}. Please review your attendance record.`;try{if(navigator.share){await navigator.share({title:'Attendance warning',text:msg});return}if(navigator.clipboard){await navigator.clipboard.writeText(msg);alert('Warning copied. You can paste it into WhatsApp, email, or another message.');return}}catch(e){if(e?.name==='AbortError')return}prompt('Copy this warning:',msg)}
-
-/* ---------- QR attendance ---------- */
-let QRSCAN={scanner:null,busy:false,last:'',lastAt:0,count:0,started:false,cameraId:''};
-function qrSessionLabel(){const l=S.labs.find(x=>x.id===S.lab);return `${l?.name||'Lab'} · Week ${S.aw}${(l?.dates||{})[S.aw]?' · '+shortDate((l.dates||{})[S.aw]):''}`}
-function qrBeep(ok=true){try{navigator.vibrate?.(ok?[60]:[80,60,80]);const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=qrBeep.ctx||(qrBeep.ctx=new C());if(c.state==='suspended')c.resume();const o=c.createOscillator(),g=c.createGain();o.frequency.value=ok?880:220;g.gain.setValueAtTime(.055,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.11);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.12)}catch(_){}}
-function qrShow(kind,title,student,detail=''){const box=$('#qrscanstatus');if(!box)return;box.className='qrstatus '+kind;const icon=kind==='ok'?'✓':kind==='warn'?'!':kind==='err'?'×':'⌁';const who=student?`${student.sn?'Serial '+esc(student.sn)+' · ':''}${esc(student.sid||'No ID')} · ${esc(student.nm||'Unnamed student')}`:'';box.innerHTML=`<div class=qrstatusicon>${icon}</div><div class=qrstatustext><b>${esc(title)}</b>${who?`<span>${who}</span>`:''}${detail?`<span>${esc(detail)}</span>`:''}</div>`;const c=$('#qrscancount');if(c)c.textContent=QRSCAN.count}
-async function startQrAttendance(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');if(typeof Html5Qrcode==='undefined')return alert('The QR scanner library did not load. Check your internet connection and reload LabTrack.');await stopQrAttendance(true);QRSCAN={scanner:null,busy:false,last:'',lastAt:0,count:0,started:false,cameraId:''};$('#modal').innerHTML=`<div class=qrscanov><div class=qrscanpanel><div class=qrscanhead><div class=grow><h2>QR attendance</h2><div class=qrscanmeta>${esc(qrSessionLabel())}${l.place?' · '+esc(l.place):''}</div></div><button class=qrscanclose onclick=stopQrAttendance()>Close</button></div><div class=qrcount><span>Point the camera toward the student's QR sticker — it can be anywhere on screen.</span><span>Marked this scan session: <b id=qrscancount>0</b></span></div><div class=qrview><div id=qr-reader></div><div class=qrguide></div></div><div class=qrscanhelp>The QR contains only the Student ID. The camera fills the screen and scans the whole frame. No alignment box is required. Scanning continues automatically.</div><div id=qrscanstatus class=qrstatus><div class=qrstatusicon>⌁</div><div class=qrstatustext><b>Starting camera…</b><span>Allow camera permission when your browser asks.</span></div></div></div></div>`;setTimeout(startQrCamera,80)}
-function qrCameraError(e){const n=e?.name||'',m=e?.message||String(e||'');if(n==='NotAllowedError'||/permission|denied/i.test(m))return 'Camera permission is blocked for this site or browser.';if(n==='NotFoundError'||/not found|no camera/i.test(m))return 'No usable camera was found on this device.';if(n==='NotReadableError'||/could not start|track start|in use|hardware/i.test(m))return 'The camera may already be in use by another app or browser tab.';if(n==='OverconstrainedError')return 'The requested camera mode is not supported by this device.';return m||'The browser could not start the camera.'}
-async function qrEnumerateCameras(){try{const probe=await navigator.mediaDevices.getUserMedia({video:true,audio:false});probe.getTracks().forEach(t=>t.stop());await new Promise(r=>setTimeout(r,120));const ds=await navigator.mediaDevices.enumerateDevices();return ds.filter(d=>d.kind==='videoinput')}catch(e){throw e}}
-function qrPreferredCamera(cams){if(!cams.length)return null;const back=cams.find(c=>/back|rear|environment|world|camera\s*0/i.test(c.label||''));return back||cams[cams.length-1]}
-function qrCameraControls(cams,selected){const head=document.querySelector('.qrscanhead');if(!head||!cams?.length)return;let sel=$('#qrcameraselect');if(!sel){const wrap=document.createElement('div');wrap.style.cssText='position:absolute;right:12px;top:calc(58px + env(safe-area-inset-top));z-index:5';wrap.innerHTML='<select id="qrcameraselect" aria-label="Camera" style="max-width:180px;background:#111827dd;color:#fff;border:1px solid #ffffff33;padding:7px 10px;border-radius:8px"></select>';head.parentElement.appendChild(wrap);sel=$('#qrcameraselect')}sel.innerHTML=cams.map((c,i)=>`<option value="${esc(c.deviceId)}" ${c.deviceId===selected?'selected':''}>${esc(c.label||('Camera '+(i+1)))}</option>`).join('');sel.onchange=()=>switchQrCamera(sel.value)}
-async function startQrCamera(forceId=''){const box=$('#qrscanstatus');try{const el=$('#qr-reader');if(!el)return;if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera access is not supported in this browser.');if(box){box.className='qrstatus';box.innerHTML='<div class=qrstatusicon>⌁</div><div class=qrstatustext><b>Starting camera…</b><span>Checking available cameras.</span></div>'}const cams=await qrEnumerateCameras();if(!cams.length)throw Object.assign(new Error('No camera found.'),{name:'NotFoundError'});const preferred=forceId?cams.find(c=>c.deviceId===forceId)||qrPreferredCamera(cams):qrPreferredCamera(cams);QRSCAN.scanner=new Html5Qrcode('qr-reader',{formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],verbose:false});let lastErr=null;const tries=[];if(preferred?.deviceId)tries.push(preferred.deviceId);tries.push({facingMode:'environment'});for(const cam of tries){try{await QRSCAN.scanner.start(cam,{fps:20},qrDecoded,()=>{});lastErr=null;break}catch(e){lastErr=e;try{await QRSCAN.scanner.stop()}catch(_){}try{QRSCAN.scanner.clear()}catch(_){}QRSCAN.scanner=new Html5Qrcode('qr-reader',{formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],verbose:false})}}if(lastErr)throw lastErr;QRSCAN.started=true;QRSCAN.cameraId=preferred?.deviceId||'';qrCameraControls(cams,QRSCAN.cameraId);qrShow('', 'Ready to scan', null, 'Show one student ID card at a time.')}catch(e){console.error('QR camera start failed',e);await stopQrCameraOnly();qrShow('err','Camera could not start',null,qrCameraError(e));const b=$('#qrscanstatus');if(b)b.insertAdjacentHTML('beforeend','<button class=qrretry onclick="restartQrCamera()">Try again</button>')}}
-async function switchQrCamera(id){const box=$('#qrscanstatus');if(box){box.className='qrstatus';box.innerHTML='<div class=qrstatusicon>⌁</div><div class=qrstatustext><b>Switching camera…</b><span>Please wait.</span></div>'}await stopQrCameraOnly();setTimeout(()=>startQrCamera(id),120)}
-async function restartQrCamera(){await stopQrCameraOnly();setTimeout(()=>startQrCamera(),120)}
-async function stopQrCameraOnly(){const q=QRSCAN.scanner;QRSCAN.scanner=null;QRSCAN.started=false;if(q){try{await q.stop()}catch(_){}try{q.clear()}catch(_){}}document.querySelectorAll('#qr-reader video').forEach(v=>{try{v.srcObject?.getTracks?.().forEach(t=>t.stop())}catch(_){}})}
-async function stopQrAttendance(keepModal=false){await stopQrCameraOnly();QRSCAN.busy=false;if(!keepModal)$('#modal').innerHTML=''}
-async function qrDecoded(decoded){const code=String(decoded??'').trim(),now=Date.now();if(!code||QRSCAN.busy)return;if(code===QRSCAN.last&&now-QRSCAN.lastAt<2200)return;QRSCAN.last=code;QRSCAN.lastAt=now;QRSCAN.busy=true;try{await qrMarkStudent(code)}finally{setTimeout(()=>QRSCAN.busy=false,350)}}
-async function qrMarkStudent(studentId){const matches=S.studs.filter(s=>String(s.sid??'').trim()===studentId);if(!matches.length){qrBeep(false);qrShow('err','Student ID not found',null,studentId);return}if(matches.length>1){qrBeep(false);qrShow('err','Duplicate Student ID in LabTrack',null,`${studentId} matches ${matches.length} records. Fix the roster before scanning.`);return}const s=matches[0],w=S.aw,l=S.labs.find(x=>x.id===S.lab);if(!l){qrBeep(false);qrShow('err','No attendance lab selected',s);return}if(S.cfg.locked?.[w]&&!S.admin){qrBeep(false);qrShow('err',`Week ${w} is locked`,s);return}const cur=(s.att||{})[w]||'';
- if(s.lab===S.lab){if(cur==='P'){qrShow('warn','Already marked present',s,`${labName(s.lab)} · Week ${w}`);return}await St(s._).update({['att.'+w]:'P',['alt.'+w]:FV()});QRSCAN.count++;qrBeep(true);qrShow('ok','Present',s,`${labName(s.lab)} · Week ${w}`);return}
- const lim=Math.max(0,+S.cfg.altLabLimit||0),used=altN(s),alreadyHere=cur==='X'&&(s.alt||{})[w]===S.lab;if(alreadyHere){qrShow('warn','Already marked here as a visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${used}/${lim}`);return}if(lim<1){qrBeep(false);qrShow('err','Other-lab attendance is disabled',s,`Home lab: ${labName(s.lab)}`);return}if(cur!=='X'&&used>=lim){qrBeep(false);qrShow('err','Other-lab allowance reached',s,`${used}/${lim} already used · Home lab: ${labName(s.lab)}`);return}await St(s._).update({['att.'+w]:'X',['alt.'+w]:S.lab});QRSCAN.count++;qrBeep(true);qrShow('ok','Present here as visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${cur==='X'?used:used+1}/${lim}`)}
-
-/* QR stickers: QR content is exactly the Student ID; identity labels are outside the sticker and are hidden when printing. */
-function openQrStickers(){if(typeof QRCode==='undefined')return alert('The QR generator library did not load. Check your internet connection and reload LabTrack.');const scope=S.lab||'',list=(scope?LS(scope):allBySerial()).filter(s=>String(s.sid??'').trim());$('#modal').innerHTML=`<div class=qrprintov><div class=qrprintpanel><div class=qrprinthead><h2>Student QR stickers</h2><div class=qrprintscope><span class=m>Scope</span><select id=qrprintscope onchange="renderQrStickers(this.value)"><option value="">All labs</option>${S.labs.map(l=>`<option value="${l.id}" ${l.id===scope?'selected':''}>${esc(l.name)}</option>`).join('')}</select><button onclick=printQrStickers()>Print</button><button class=g onclick=closeQrStickers()>Close</button></div></div><p class=qrprintnote>Each printed sticker is QR-only. The printed QR itself is 18 mm square inside a 25 mm white square, giving it a clear quiet zone for faster scanning. The on-screen name/ID is only for matching stickers to students and is hidden when printing. QR content = exact Student ID.</p><div id=qrprintgrid class=qrprintgrid></div></div></div>`;renderQrStickers(scope)}
-function renderQrStickers(scope){const list=(scope?LS(scope):allBySerial()).filter(s=>String(s.sid??'').trim()),grid=$('#qrprintgrid');if(!grid)return;grid.innerHTML=list.length?list.map((s,i)=>`<div class=qrprintitem><div class=qrsticker><div id="qrcode_${i}"></div></div><div class=qrprintwho><b>Serial ${esc(s.sn||'—')} · ${esc(s.sid)}</b><span>${esc(s.nm||'Unnamed student')}</span><span>${esc(labName(s.lab))}</span></div></div>`).join(''):'<div class="card emptyresults">No students with IDs were found in this scope.</div>';requestAnimationFrame(()=>{list.forEach((s,i)=>{const e=document.getElementById('qrcode_'+i);if(!e)return;new QRCode(e,{text:String(s.sid).trim(),width:256,height:256,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.Q})})})}
-function printQrStickers(){document.body.classList.add('qrprinting');const done=()=>{document.body.classList.remove('qrprinting');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);window.print();setTimeout(done,1500)}
-function closeQrStickers(){document.body.classList.remove('qrprinting');$('#modal').innerHTML=''}
-
-/* ---------- Excel import / export ---------- */
-function parse(rows){if(!rows.length)return[];const h=rows[0].map(x=>String(x).toLowerCase().trim()),f=r=>h.findIndex(x=>r.test(x));
- let c={sn:f(/serial|^sn$|^no\.?$|^#$/),sid:f(/\bid\b|code/),nm:f(/name/)},st=1;if(c.sid<0&&c.nm<0){st=0;c=rows[0].length>2?{sn:0,sid:1,nm:2}:{sn:-1,sid:0,nm:1}}
- return rows.slice(st).filter(r=>r.some(x=>x!=='')).map(r=>({sn:c.sn<0?'':String(r[c.sn]??'').trim(),sid:c.sid<0?'':String(r[c.sid]??'').trim(),nm:c.nm<0?'':String(r[c.nm]??'').trim()}))}
-/* Course serial files exported for this course may contain only ID + Name.
-   In that format, the student's serial is the 1-based order of the data rows. */
-function parseCourseSerials(rawRows){
- if(!rawRows.length)return {rows:[],source:'none'};
- const h=rawRows[0].map(x=>String(x??'').toLowerCase().trim());
- const hasSerial=h.some(x=>/serial|^sn$|^no\.?$|^#$/.test(x));
- const rows=parse(rawRows);
- if(hasSerial)return {rows,source:'column'};
- return {rows:rows.map((q,i)=>({...q,sn:String(i+1)})),source:'row-order'}
-}
-function parseSisRoster(text){
- const clean=v=>String(v??'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(),out=[],seen=new Set();
- const add=(cells)=>{if(cells.length<3)return;const sid=clean(cells[1]),nm=clean(cells[2]);if(!sid||!nm||/^id$/i.test(sid)||/^name$/i.test(nm))return;const k=norm(sid);if(!k||seen.has(k))return;seen.add(k);out.push({sn:'',sid,nm})};
- try{const d=new DOMParser().parseFromString(String(text||''),'text/html');for(const tr of d.querySelectorAll('table tr'))add([...tr.children].filter(x=>/^(TD|TH)$/i.test(x.tagName)).map(x=>x.textContent||''))}catch(e){}
- if(out.length)return out;
- /* Oracle SIS exports an HTML table with an .xls extension and may omit closing </tr> tags. */
- const decode=x=>{const d=new DOMParser().parseFromString('<body>'+x+'</body>','text/html');return d.body.textContent||''};
- for(const part of String(text||'').split(/<tr\b[^>]*>/i).slice(1)){const cells=[...part.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m=>decode(m[1]));add(cells)}
- return out
-}
-async function commitOps(ops){for(let i=0;i<ops.length;i+=400){const b=db.batch();for(const o of ops.slice(i,i+400)){if(o.t=='delete')b.delete(o.ref);else if(o.t=='set')b.set(o.ref,o.data);else b.update(o.ref,o.data)}await b.commit()}}
-async function syncSisRoster(rows,inp){
- const col=db.collection('students'),pool=LS(S.lab),fileIds=new Set(rows.map(q=>norm(q.sid)).filter(Boolean)),keep=new Set(),adds=[];
- const existingById=new Map();for(const s of pool){const k=norm(s.sid);if(k&&!existingById.has(k))existingById.set(k,s)}
- for(const q of rows){const k=norm(q.sid),s=existingById.get(k);if(s)keep.add(s._);else adds.push(q)}
- const rem=pool.filter(s=>!fileIds.has(norm(s.sid)));
- if(!confirm(`Synchronize this lab from the original SIS .xls file?\n\nStudents read from SIS: ${rows.length}\nKeep unchanged: ${keep.size}\nAdd: ${adds.length}\nRemove: ${rem.length}\n\nExisting students keep their attendance, grades, serial number, and stored name.`)){inp.value='';return}
- const ops=[];rem.forEach(s=>ops.push({t:'delete',ref:col.doc(s._)}));adds.forEach(q=>ops.push({t:'set',ref:col.doc(),data:{lab:S.lab,sn:'',sid:q.sid,nm:q.nm,att:{},alt:{},g:{}}}));await commitOps(ops);
- alert(`SIS roster synchronized.\nRead: ${rows.length}\nKept unchanged: ${keep.size}\nAdded: ${adds.length}\nRemoved: ${rem.length}`)
-}
-function imp(inp,kind){const f=inp.files[0];if(!f)return;
- if(kind==0){
-  if(!/\.xls$/i.test(f.name)){alert('Please upload the original SIS .xls roster file. No conversion to .xlsx is needed.');inp.value='';return}
-  const r=new FileReader();r.onload=async e=>{try{const rows=parseSisRoster(e.target.result);if(!rows.length)throw new Error('No SIS students were found. Expected Student ID in column 2 and Name in column 3.');await syncSisRoster(rows,inp)}catch(x){alert('SIS roster import failed: '+x.message)}finally{inp.value=''}};r.onerror=()=>{alert('Could not read the SIS .xls file.');inp.value=''};r.readAsText(f,'utf-8');return
- }
- const r=new FileReader();r.onload=async e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rawRows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}),parsed=parseCourseSerials(rawRows),rows=parsed.rows,col=db.collection('students');
-  if(!rows.length)throw new Error('No students were found in the serial file.');
-  const sourceNote=parsed.source==='row-order'?`No Serial column was found. LabTrack will use the file order as the course serial: 1 to ${rows.length}.`:'LabTrack found an explicit Serial column and will use it.';
-  if(!confirm(`Import serial numbers for ALL labs?\n\n${sourceNote}\n\nMatching students will have their current serial number overwritten regardless of which lab they attend.`)){inp.value='';return}let upd=0,miss=0,amb=0;const ops=[],byId=new Map(),byName=new Map();for(const s of S.studs){const ik=norm(s.sid),nk=norm(s.nm);if(ik){const a=byId.get(ik)||[];a.push(s);byId.set(ik,a)}if(nk){const a=byName.get(nk)||[];a.push(s);byName.set(nk,a)}}for(const q of rows){let matches=[];if(q.sid)matches=byId.get(norm(q.sid))||[];else if(q.nm)matches=byName.get(norm(q.nm))||[];if(matches.length===1){ops.push({t:'update',ref:col.doc(matches[0]._),data:{sn:String(q.sn??'').trim()}});upd++}else if(matches.length>1)amb++;else miss++}await commitOps(ops);const used=parsed.source==='row-order'?`Row order used as serial: 1–${rows.length}`:'Explicit Serial column used';alert(`Course serial import complete across all labs.\n${used}\nUpdated: ${upd}\nNot found: ${miss}\nAmbiguous (not changed): ${amb}`)
- }catch(x){alert('Serial import failed: '+x.message)}finally{inp.value=''}};r.readAsArrayBuffer(f)
-}
-function save(rows,name){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name.replace(/[^\w-]+/g,'_')+'.xlsx')}
-function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab',l.name],['Place',l.place||''],[],['Serial','ID','Name',...rng(W).map(w=>'Week '+w+((l.dates||{})[w]?' - '+(l.dates||{})[w]:'')),'Attended sessions','Absent sessions','Other-lab sessions']];
- LS(l.id).forEach(s=>{const a=s.att||{};rows.push([s.sn,s.sid,s.nm,...rng(W).map(w=>a[w]=='P'?'Attended':a[w]=='A'?'Absent':a[w]=='X'?'Attended in '+labName((s.alt||{})[w]):''),attN(s),absN(s),altN(s)])});save(rows,'Lab_'+l.name)}
-function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
-
-/* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';const all=focusList(S.gl),shown=gradeStudents();return `<div class=card><div class=scopebar><label><span>Students</span><select onchange="S.gl=this.value;S.gq='';detailScrollX=0;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><span class=scopehint>This selection applies to both normal grading and Focus mode. Students are sorted by serial.</span></div><div class=row><button onclick=exTpl()>Export course Excel (v24)</button><button class=g onclick=exGr()>Export simple grades</button></div>
-${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10px;margin-top:10px"><span class=m>Focus grading:</span><select class=compact onchange="S.gfk=this.value">${inp.map(i=>`<option value="${i.k}" ${i.k===S.gfk?'selected':''}>${esc(i.n)}</option>`).join('')}</select><button onclick=startGradeFocus()>Start focus mode${S.gq?' · filtered':''}</button><span class=m>${S.gl?esc(labName(S.gl)):'All labs'} · serial order</span></div>`:''}
-<div class=searchbar><input data-f=gq value="${esc(S.gq)}" placeholder="Search student by serial, ID or name" oninput="S.gq=this.value;render()"><span class=searchcount>Showing ${shown.length} of ${all.length}</span>${S.gq?'<button class=g onclick="S.gq=\'\';render()">Clear</button>':''}</div>
-<p class=m>The identity row stays compact and fixed. Scores use compact Design-A-sized cells in one continuous lower row. Drag the score strip horizontally and all students move together. Search also filters Focus mode.</p></div>
-${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${shown.map(s=>{const m=calc(s),g=s.g||{};return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class=namecell><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class=badge>${esc(labName(s.lab))}</span><div class=statusinline><span>Status</span><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select></div></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${it.map(i=>i.t=='in'?`<div class=gradecell><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=scorebox><input data-f="${s._}_${i.k}" inputmode=decimal ${g[i.k]==='Abs'?'disabled':''} value="${g[i.k]==='Abs'?'':esc(g[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)"><button class="absbtn ${g[i.k]==='Abs'?'on':''}" title="Mark absent" onclick="if(syncClickGuard())return;toggleScoreAbs('${s._}','${i.k}')">ABS</button></div></div>`:`<div class="gradecell calc"><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=calcvalue>${m[i.k]??'—'}</div></div>`).join('')}</div></div></div></div>`}).join('')}</div>`:'<div class="card emptyresults">No students match your search.</div>'}`}
-function setG(id,k,v){v=v.trim();const n=+v;St(id).update({['g.'+k]:v===''?FV():isNaN(n)?v:n})}
-function toggleScoreAbs(id,k){const s=S.studs.find(x=>x._===id),on=(s?.g||{})[k]==='Abs';St(id).update({['g.'+k]:on?FV():'Abs'})}
-
-/* ---------- focus modes ---------- */
-function focusList(scope){return (scope?S.studs.filter(s=>s.lab===scope):[...S.studs]).sort(serialCmp)}
-function startAttendanceFocus(){if(!S.lab)return alert('Choose a lab first.');if(S.cfg.locked?.[S.aw]&&!S.admin)return alert('This week is locked.');const xs=attStudents();if(!xs.length)return alert(S.aq?'No students match your search.':'There are no students in this lab.');FO={type:'att',ids:xs.map(s=>s._),i:0,w:S.aw,lab:S.lab};renderFocus()}
-function startGradeFocus(){const item=S.cfg.items.find(i=>i.k===S.gfk&&i.t==='in');if(!item)return alert('Choose a score first.');const xs=gradeStudents();if(!xs.length)return alert(S.gq?'No students match your search.':'There are no students in this selection.');FO={type:'gr',ids:xs.map(s=>s._),i:0,k:item.k,scope:S.gl};renderFocus()}
-function closeFocus(){FO=null;$('#modal').innerHTML=''}
-function focusStudent(){if(!FO)return null;let s=S.studs.find(x=>x._===FO.ids[FO.i]);if(s)return s;for(let j=FO.i+1;j<FO.ids.length;j++){s=S.studs.find(x=>x._===FO.ids[j]);if(s){FO.i=j;return s}}return null}
-function focusStep(d){if(!FO)return;FO.i+=d;if(FO.i<0)FO.i=0;if(FO.i>=FO.ids.length)return renderFocusDone();renderFocus()}
-function focusPct(){return !FO||!FO.ids.length?0:Math.round(((FO.i+1)/FO.ids.length)*100)}
-function focusBase(s,subtitle,body){const total=FO.ids.length,n=Math.min(FO.i+1,total);$('#modal').innerHTML=`<div class=focusov><div class=focuspanel><div class=focushead><div class=grow><h2>Focus mode</h2><span class=m>${esc(subtitle)}</span></div><span class=badge>${n} / ${total}</span><button class=g onclick=closeFocus()>Exit</button></div><div class=focusprogress><span style="width:${focusPct()}%"></span></div>${body}</div></div>`}
-function renderFocus(){if(!FO)return;const s=focusStudent();if(!s)return renderFocusDone();if(FO.type==='att')return renderAttendanceFocus(s);renderGradeFocus(s)}
-function renderAttendanceFocus(s){const l=S.labs.find(x=>x.id===FO.lab),w=FO.w,v=(s.att||{})[w]||'',status=v==='P'?'Attended':v==='A'?'Absent':v==='X'?'Attended in '+labName((s.alt||{})[w]):'Not marked';const cls=v==='P'?'blue':v==='A'?'warn':v==='X'?'blue':'';focusBase(s,`${l?.name||'Lab'} · Week ${w}${(l?.dates||{})[w]?' · '+shortDate((l.dates||{})[w]):''}`,`<div class=focuscard><div class=focusserial>Serial ${esc(s.sn||'—')}</div><div class=focusid>${esc(s.sid||'No ID')}</div><div class=focusname>${esc(s.nm||'Unnamed student')}</div><div class=focusmeta><span class=badge>${esc(labName(s.lab))}</span><span class="badge ${cls}">${esc(status)}</span><span class=badge>Other lab ${altN(s)}/${Math.max(0,+S.cfg.altLabLimit||0)}</span></div><div class=focusactions><button class=present onclick="focusAttendanceSave('P')">✓ Attended</button><button class=absent onclick="focusAttendanceSave('A')">✕ Absent</button></div><div class=focusnav><button class=g onclick="focusStep(-1)" ${FO.i===0?'disabled':''}>Previous</button><button class=g onclick="focusStep(1)">Skip / Next</button></div></div>`)}
-async function focusAttendanceSave(v){if(!FO)return;if(S.cfg.locked?.[FO.w]&&!S.admin)return alert('This week is locked.');const s=focusStudent();if(!s)return;try{await St(s._).update({['att.'+FO.w]:v,['alt.'+FO.w]:FV()});focusStep(1)}catch(e){alert(e.message)}}
-function renderGradeFocus(s){const item=S.cfg.items.find(i=>i.k===FO.k),g=(s.g||{})[FO.k],isAbs=g==='Abs',val=isAbs?'':(g??'');FO.entry=val===''?'':String(val);FO.entryFresh=true;const total=FO.ids.length,n=Math.min(FO.i+1,total);$('#modal').innerHTML=`<div class=focusov><div class="focuspanel gradefocus"><div class=focushead><div class=grow><h2>Focus grading</h2><span class=m>${esc(item?.n||'Score')} · ${esc(FO.scope?labName(FO.scope):'All students')}</span></div><span class=badge>${n} / ${total}</span><button class=g onclick=closeFocus()>Exit</button></div><div class=focusprogress><span style="width:${focusPct()}%"></span></div><div class="focuscard gradeidentity"><div class=focusserial>Serial ${esc(s.sn||'—')} · ${esc(labName(s.lab))}</div><div class=focusid>${esc(s.sid||'No ID')}</div><div class=focusname>${esc(s.nm||'Unnamed student')}</div><div class=focusmeta>${isAbs?'<span class="badge warn">Current: ABS</span>':val!==''?`<span class="badge blue">Current: ${esc(focusGradePretty(val))} / ${esc(item?.max??'')}</span>`:'<span class=badge>Not graded</span>'}</div></div><div class=focusgradeconsole><div class=focusgradedisplayrow><div class=focusgradedisplaywrap><div class=focusgradedisplaylabel>Score</div><div id=fgdisplay class=focusgradedisplay>${esc(focusGradePretty(FO.entry)||'—')}</div></div><div class=focusgrademax>${item?.max?`/ ${esc(item.max)}`:'Score'}</div></div><div class=focusgradework><div class=focuskeypad><button onclick="focusGradeKey('1')">1</button><button onclick="focusGradeKey('2')">2</button><button onclick="focusGradeKey('3')">3</button><button class=fraction aria-label="Add one quarter" onclick="focusGradeFraction(.25)">¼</button><button onclick="focusGradeKey('4')">4</button><button onclick="focusGradeKey('5')">5</button><button onclick="focusGradeKey('6')">6</button><button class=fraction aria-label="Add one half" onclick="focusGradeFraction(.5)">½</button><button onclick="focusGradeKey('7')">7</button><button onclick="focusGradeKey('8')">8</button><button onclick="focusGradeKey('9')">9</button><button class=fraction aria-label="Add three quarters" onclick="focusGradeFraction(.75)">¾</button><button class=softkey onclick="focusGradeKey('.')">.</button><button onclick="focusGradeKey('0')">0</button><button class=softkey aria-label="Backspace" onclick=focusGradeBack()>⌫</button><button class=entryclear aria-label="Clear current entry" onclick=focusGradeEntryClear()>C</button></div><div class=focusgradeprimary><button class=absent onclick=focusGradeAbs()>ABS & Next</button><button onclick=focusGradeSave()>Save & Next</button></div><div class=focusgradeutility><button onclick="focusStep(-1)" ${FO.i===0?'disabled':''}>Previous</button><button onclick="focusStep(1)">Skip / Next</button><button class=clear onclick=focusGradeClear()>Clear score</button></div></div><div class=focusgradehint>¼, ½ and ¾ add to the current score. C clears only the typed entry; Clear score removes the saved grade.</div></div></div></div>`}
-function focusGradePretty(v){if(v===null||v===undefined||v==='')return '';const raw=String(v);if(raw.endsWith('.'))return raw;const n=Number(raw);if(!Number.isFinite(n))return raw;const q=Math.round(n*4);if(Math.abs(n*4-q)>1e-8)return raw;const whole=Math.trunc(q/4),rem=Math.abs(q%4),f=rem===1?'¼':rem===2?'½':rem===3?'¾':'';if(!f)return String(whole);return whole===0?f:String(whole)+f}
-function focusGradeDisplay(){const e=$('#fgdisplay');if(e)e.textContent=focusGradePretty(FO?.entry)||'—'}
-function focusGradeFraction(add){if(!FO||FO.type!=='gr')return;let raw=String(FO.entry??'').trim(),base=raw===''?0:Number(raw);if(!Number.isFinite(base))base=parseFloat(raw)||0;const n=Math.round((base+Number(add))*100)/100;FO.entry=String(n);FO.entryFresh=false;focusGradeDisplay()}
-function focusGradeEntryClear(){if(!FO||FO.type!=='gr')return;FO.entry='';FO.entryFresh=false;focusGradeDisplay()}
-function focusGradeKey(k){if(!FO||FO.type!=='gr')return;let v=String(FO.entry??'');if(FO.entryFresh){if(k==='.')v=v&&!v.includes('.')?v+'.':'0.';else v=k;FO.entryFresh=false}else if(k==='.') {if(v.includes('.'))return;v=v?v+'.':'0.'}else{if(v==='0')v=k;else v+=k}if(v.length>8)return;FO.entry=v;focusGradeDisplay()}
-function focusGradeBack(){if(!FO||FO.type!=='gr')return;const v=String(FO.entry??'');FO.entryFresh=false;FO.entry=v.slice(0,-1);focusGradeDisplay()}
-async function focusGradeSave(){if(!FO)return;const s=focusStudent(),item=S.cfg.items.find(i=>i.k===FO.k),raw=String(FO.entry??'').trim();if(!s||!item)return;if(raw==='')return alert('Enter a grade, choose ABS, or use Skip / Next.');const n=+raw;if(Number.isNaN(n))return alert('Enter a numeric grade.');if(n<0)return alert('Grade cannot be below 0.');if(item.max>0&&n>+item.max)return alert(`Grade cannot exceed ${item.max}.`);try{await St(s._).update({['g.'+FO.k]:n});focusStep(1)}catch(e){alert(e.message)}}
-async function focusGradeAbs(){if(!FO)return;const s=focusStudent();if(!s)return;try{await St(s._).update({['g.'+FO.k]:'Abs'});focusStep(1)}catch(e){alert(e.message)}}
-async function focusGradeClear(){if(!FO)return;const s=focusStudent();if(!s)return;try{await St(s._).update({['g.'+FO.k]:FV()});if(s.g)delete s.g[FO.k];FO.entry='';FO.entryFresh=true;renderFocus()}catch(e){alert(e.message)}}
-function renderFocusDone(){if(!FO)return;const t=FO.type==='att'?'Attendance focus complete':'Grading focus complete';$('#modal').innerHTML=`<div class=focusov><div class=focuspanel><div class=focusdone><div class=big>✓</div><h2>${t}</h2><p class=m>You reached the end of this student list.</p><div class=row style="justify-content:center"><button onclick="FO.i=0;renderFocus()">Start again</button><button class=g onclick=closeFocus()>Close</button></div></div></div></div>`}
-
-
-/* ---------- instructor management ---------- */
-const fmtWhen=t=>{try{return t?.toDate?t.toDate().toLocaleDateString():''}catch(_){return''}};
-function vIns(){if(!S.admin)return '<div class=card>Admin access required.</div>';const xs=S.instructors.slice().sort((a,b)=>{const o={pending:0,approved:1,rejected:2};return (o[a.status]??9)-(o[b.status]??9)||String(a.name||'').localeCompare(String(b.name||''))}),n=s=>xs.filter(x=>x.status===s).length;
- return `<div class=card><h2>Instructor accounts</h2><p class=m>New instructors create their own LabTrack account. They cannot access attendance, grades, labs, or students until you approve them here.</p><div class=insgrid><div class=statbox><b>${n('pending')}</b>Pending</div><div class=statbox><b>${n('approved')}</b>Approved</div><div class=statbox><b>${n('rejected')}</b>Rejected</div></div></div>
-<div class=card style="padding:0"><div class=instructorrow style="font-size:12px;font-weight:700;background:#e8ecf3"><div>Instructor</div><div>Email</div><div>Status</div><div>Action</div></div>${xs.map(p=>{const self=p.id===S.user.uid,st=p.status||'pending';return `<div class=instructorrow><div class=who><b>${esc(p.name||'Unnamed instructor')}</b><span class=m>${p.role==='admin'?'Administrator':'Instructor'}${fmtWhen(p.createdAt)?' · joined '+esc(fmtWhen(p.createdAt)):''}</span></div><div>${esc(p.email||'')}</div><div><span class="badge status ${esc(st)}">${esc(st)}</span></div><div>${self?'<span class=m>This is you</span>':st==='pending'?`<button onclick="approveInstructor('${p.id}')">Approve</button> <button class=d onclick="rejectInstructor('${p.id}')">Reject</button>`:st==='approved'?`<button class=d onclick="rejectInstructor('${p.id}')">Revoke access</button>`:`<button onclick="approveInstructor('${p.id}')">Approve</button> <button class=g onclick="pendingInstructor('${p.id}')">Set pending</button>`}</div></div>`}).join('')||'<div style="padding:16px" class=m>No instructor profiles yet.</div>'}</div>`}
-async function approveInstructor(uid){if(!S.admin)return;try{await db.collection('instructors').doc(uid).set({approved:true,status:'approved',role:'instructor',approvedAt:ts(),approvedBy:S.user.uid},{merge:true})}catch(e){alert(e.message)}}
-async function rejectInstructor(uid){if(!S.admin||uid===S.user.uid)return;if(!confirm('Remove this instructor\'s LabTrack access? Their account will remain stored and can be approved again later.'))return;try{await db.collection('instructors').doc(uid).set({approved:false,status:'rejected',rejectedAt:ts(),rejectedBy:S.user.uid},{merge:true})}catch(e){alert(e.message)}}
-async function pendingInstructor(uid){if(!S.admin||uid===S.user.uid)return;try{await db.collection('instructors').doc(uid).set({approved:false,status:'pending'},{merge:true})}catch(e){alert(e.message)}}
-function securityCard(){return S.admin?`<div class=card><h3>Firebase security rules <span class="badge blue">Required once</span></h3><p class=m>These rules make Pending and Rejected accounts unable to read student data even if someone bypasses the LabTrack interface. Publish them once in Firebase Console → Firestore Database → Rules.</p><pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy secure rules</button></div>`:''}
-
-/* ---------- settings ---------- */
-function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
- const desc=i=>i.t=='att'?(i.mode=='pen'?`max minus ${i.pen} per absence`:'attended / weeks x max'):i.t=='grp'?`${i.agg=='avg'?'average':'sum'} of ${i.top?'highest '+i.top+' of ':''}${(i.src||[]).map(nm).join(', ')}${i.mul!=1?' x '+i.mul:''}`:i.t=='sum'?(i.src||[]).map(nm).join(' + '):'';
- return `<div class=card><h3>Course settings</h3>${S.admin?'':'<p class=m>Only the admin can change grading structure and lock weeks.</p>'}
-<label>Number of weeks<input type=number min=1 max=30 ${S.admin?'':'disabled'} value="${c.weeks}" onchange="Cf().update({weeks:+this.value||12})"></label></div>
-<div class=card><h3>Attendance policy</h3><p class=m>These two values can be adjusted by any signed-in instructor.</p>
-<label>Other-lab attendance allowance per student<input type=number min=0 max=30 value="${c.altLabLimit??2}" onchange="Cf().set({altLabLimit:Math.max(0,+this.value||0)},{merge:true})"></label>
-<label>Absence warning threshold <span class=m>(warning appears after the student exceeds this number)</span><input type=number min=0 max=30 value="${c.absenceWarn??3}" onchange="Cf().set({absenceWarn:Math.max(0,+this.value||0)},{merge:true})"></label></div>
-<div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
-${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
-<p class=m>Group: pick scores (like quizzes), then choose average or sum, only the highest N, and a multiplier. Sum: add any items together, including groups and other sums.</p>`:''}</div>${tplCards(c)}${securityCard()}`}
-function editItem(k,t){const i=k?{...S.cfg.items.find(x=>x.k===k)}:{k:'c'+Date.now(),t,n:'',max:10,src:[],top:0,agg:'avg',mul:1,mode:'ratio',pen:1},o=S.cfg.items.filter(x=>x.k!==i.k),sel=(a,b)=>a==b?'selected':'';
- $('#modal').innerHTML=`<div class=ov><div class=card><h3>${k?'Edit':'New'} item</h3>
-<label>Name<input id=m_n value="${esc(i.n)}"></label><label>Max grade<input id=m_max type=number step=any value="${i.max}"></label>
-${i.t=='att'?`<label>Rule<select id=m_mode><option value=ratio ${sel(i.mode,'ratio')}>Attended / weeks x max</option><option value=pen ${sel(i.mode,'pen')}>Max minus marks per absence</option></select></label><label>Marks lost per absence<input id=m_pen type=number step=any value="${i.pen}"></label>`:''}
-${i.t=='grp'||i.t=='sum'?`<p class=m>Use these items:</p>${o.map(x=>`<label class=ck><input type=checkbox value="${x.k}" ${(i.src||[]).includes(x.k)?'checked':''}>${esc(x.n)}</label>`).join('')}`:''}
-${i.t=='grp'?`<label>Highest N only (0 = all)<input id=m_top type=number value="${i.top}"></label><label>Combine by<select id=m_agg><option value=avg ${sel(i.agg,'avg')}>Average</option><option value=sum ${sel(i.agg,'sum')}>Sum</option></select></label><label>Multiply result by<input id=m_mul type=number step=any value="${i.mul}"></label>`:''}
-<div class=row><button onclick="saveItem('${i.k}','${i.t}')">Save item</button><button class=g onclick="$('#modal').innerHTML=''">Cancel</button></div></div></div>`}
-function saveItem(k,t){const g=x=>$('#m_'+x)?.value,i={k,t,n:g('n')||'Item',max:+g('max')||0};
- if(t=='att'){i.mode=g('mode');i.pen=+g('pen')||0}
- if(t=='grp'||t=='sum')i.src=[...document.querySelectorAll('#modal input[type=checkbox]:checked')].map(x=>x.value);
- if(t=='grp'){i.top=+g('top')||0;i.agg=g('agg');i.mul=g('mul')===''?1:+g('mul')}
- const it=S.cfg.items.slice(),x=it.findIndex(y=>y.k===k);x<0?it.push(i):it[x]=i;Cf().update({items:it});$('#modal').innerHTML=''}
-function delItem(k){if(!confirm('Remove this item?'))return;Cf().update({items:S.cfg.items.filter(i=>i.k!==k).map(i=>i.src?{...i,src:i.src.filter(x=>x!==k)}:i)})}
-const CRS0={univ:'Galala University',prog:'PharmD-Clinical Pharmacy Program',sem:'FALL 2025-2026',code:'PPC101',name:'MEDICINAL PLANTS',ch:'3',inst:'Assoc. Prof. Dr. Reda Foad Abdelhameed'};
-const SL=['Regular Student','Midterm Excuse','Final Exam Excuse','Withdraw','Incomplete Approved','Repeat Course_Failed','Repeat Course_Improve','Cheating','Other'];
-const CL=[['univ','University'],['prog','Program'],['sem','Semester'],['code','Course code'],['name','Course name'],['ch','Credit hours'],['inst','Instructor name']];
-const TC=[['mid','Midterm'],['cw','Class work (Quizzes + Project)'],['pr','Practical exam'],['fin','Final']];
-function tplCards(c){const ro=S.admin?'':'disabled';return `<div class=card><h3>Excel template</h3>
-<p class=m>Upload your template once (use_this.xlsx). Then choose which grading item fills each template column.</p>
-<div class=row><input type=file id=tf hidden accept=".xlsx" onchange="upTpl(this)"><button class=g ${ro} onclick="$('#tf').click()">Upload template (.xlsx)</button><button class=g ${ro} onclick=useTpl()>Use template items</button></div>
-${TC.map(([k,n])=>`<label>${n}<select ${ro} onchange="setMap('${k}',this.value)"><option value="">Choose item</option>${c.items.map(i=>`<option value="${i.k}" ${(c.map||{})[k]==i.k?'selected':''}>${esc(i.n)}</option>`).join('')}</select></label>`).join('')}
-${CL.map(([k,n])=>`<label>${n}<input ${ro} value="${esc((c.course||{})[k]??CRS0[k])}" onchange="setCrs('${k}',this.value)"></label>`).join('')}</div>`}
-function setSt(id,v){St(id).update({st:v})}
-function setCrs(k,v){Cf().set({course:{[k]:v}},{merge:true})}
-function setMap(k,v){Cf().set({map:{[k]:v}},{merge:true})}
-function useTpl(){if(!confirm('Replace the grading items with Midterm, Class work, Practical exam and Final?'))return;
- Cf().update({items:[{k:'mid',n:'Midterm',t:'in',max:10},{k:'cw',n:'Class work (Quizzes + Project)',t:'in',max:20},{k:'pr',n:'Practical exam',t:'in',max:30},{k:'fin',n:'Final',t:'in',max:40}],map:{mid:'mid',cw:'cw',pr:'pr',fin:'fin'}})}
-function upTpl(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
- r.onload=e=>{const b=e.target.result.split(',')[1];if(b.length>900000)return alert('This file is too big.');
-  db.doc('cfg/template').set({b64:b,name:f.name}).then(()=>alert('Template saved in LabTrack v19.')).catch(x=>alert(x.message));inp.value=''};r.readAsDataURL(f)}
-async function exTpl(){const c=S.cfg,m=c.map||{},it=k=>c.items.find(i=>i.k==k),cr={...CRS0,...c.course};
- if(!TC.every(([k])=>it(m[k])))return alert('Open Settings, Excel template, and choose an item for each column first.');
- const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
- const t=await db.doc('cfg/template').get();if(!t.exists)return alert('Upload the template in Settings first.');
- try{
-  const zip=await JSZip.loadAsync(t.data().b64,{base64:true}),P='xl/worksheets/sheet',rd=f=>{const z=zip.file(f);if(!z)throw new Error('Template is missing '+f);return z.async('string')};
-  let xml=await rd(P+'1.xml');
-  const formulaCountBefore=(xml.match(/<f\b/g)||[]).length,rowCountBefore=(xml.match(/<row\b/g)||[]).length;
-
-  const xr=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const xe=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const cleanAttrs=a=>(' '+String(a||'').trim()).replace(/\s+t="[^"]*"/g,'').replace(/^\s*/,' ');
-
-  // Microsoft Excel is much stricter than Google Sheets about the Shared String Table.
-  // Earlier LabTrack builds changed many template cells from shared strings to inlineStr
-  // while leaving the template's sharedStrings metadata unchanged. Google Sheets repairs
-  // that silently, but Excel can reject the package. V10 keeps Excel-style shared strings.
-  const sstPath='xl/sharedStrings.xml',sstFile=zip.file(sstPath);
-  if(!sstFile)throw new Error('Template is missing xl/sharedStrings.xml');
-  let sstXml=await sstFile.async('string');
-  const sstDoc=new DOMParser().parseFromString(sstXml,'application/xml');
-  if(sstDoc.getElementsByTagName('parsererror').length)throw new Error('Template sharedStrings.xml is invalid.');
-  const sis=[...sstDoc.getElementsByTagName('si')],sharedMap=new Map();
-  sis.forEach((si,i)=>{const txt=[...si.getElementsByTagName('t')].map(x=>x.textContent||'').join('');if(!sharedMap.has(txt))sharedMap.set(txt,i)});
-  const addedStrings=[];
-  const sharedIndex=v=>{v=String(v??'');if(sharedMap.has(v))return sharedMap.get(v);const i=sis.length+addedStrings.length;sharedMap.set(v,i);addedStrings.push(v);return i};
-
-  const make=(ref,attrs,v,kind='auto')=>{attrs=cleanAttrs(attrs||('r="'+ref+'"'));if(!/\br="[^"]+"/.test(attrs))attrs+=' r="'+ref+'"';
-   if(v===''||v==null)return '<c'+attrs+'></c>';
-   if(kind==='text'){const i=sharedIndex(v);return '<c'+attrs+' t="s"><v>'+i+'</v></c>'}
-   const n=typeof v==='number'?v:(typeof v==='string'&&/^-?\d+(?:\.\d+)?$/.test(v.trim())?+v:NaN);
-   if(kind==='number'||!Number.isNaN(n))return '<c'+attrs+'><v>'+String(kind==='number'?+v:n)+'</v></c>';
-   const i=sharedIndex(v);return '<c'+attrs+' t="s"><v>'+i+'</v></c>'};
-  const patchCell=(row,ref,v,kind='auto')=>{
-   const re=new RegExp('<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)\\s*\\/>|<c\\b([^>]*\\br="'+xr(ref)+'"[^>]*)>([\\s\\S]*?)<\\/c>');
-   const hit=row.match(re);if(!hit)throw new Error('Template cell '+ref+' is missing.');
-   return row.replace(re,make(ref,hit[1]||hit[2],v,kind));
+function cleanLab(l,i){
+  const stamp=Date.now();
+  l=(l && typeof l==="object") ? l : {};
+  const out={
+    id: l.id ? String(l.id) : "lab"+stamp+"_"+i,
+    name: l.name ? String(l.name) : "Lab "+((i||0)+1),
+    note: l.note ? String(l.note) : "",
+    round: Number(l.round)||1,
+    questions: Array.isArray(l.questions) ? l.questions.filter(q=>q && typeof q==="object").map((q,j)=>({
+      id: q.id ? String(q.id) : "q"+stamp+"_"+i+"_"+j,
+      text: String(q.text==null ? "" : q.text),
+      value: Number(q.value)||1,
+      used: !!q.used,
+      ...(typeof q.imageId==="string" && q.imageId ? {imageId:q.imageId} : {})
+    })) : []
   };
+  if(typeof l._ord==="number") out._ord=l._ord;
+  return out;
+}
+function cleanStudent(s,i){
+  const stamp=Date.now();
+  s=(s && typeof s==="object") ? s : {};
+  return Object.assign({}, s, {
+    id: s.id ? String(s.id) : "s"+stamp+"_"+i,
+    name: String(s.name==null ? "" : s.name),
+    studentId: String(s.studentId==null ? "" : s.studentId),
+    balance: Number(s.balance)||0,
+    history: Array.isArray(s.history) ? s.history : []
+  });
+}
+// Repairs old or broken saved data so the app never crashes on it
+function cleanState(parsed){
+  const base = cloneState(defaultState);
+  if(!parsed || typeof parsed!=="object") return base;
+  let labs = Array.isArray(parsed.labs) ? parsed.labs.filter(l=>l && typeof l==="object").map(cleanLab) : [];
+  if(!labs.length) labs = base.labs;
+  const students = Array.isArray(parsed.students) ? parsed.students.filter(s=>s && typeof s==="object").map(cleanStudent) : [];
+  const currentLabId = labs.some(l=>l.id===parsed.currentLabId) ? parsed.currentLabId : labs[0].id;
+  const activeStudentId = students.some(s=>s.id===parsed.activeStudentId) ? parsed.activeStudentId : null;
+  return {currentLabId, activeStudentId, labs, students};
+}
 
-  const mx=k=>+it(m[k]).max||0,G=mx('mid')+mx('cw')+mx('pr'),mc=ss.map(calc);
-  const val=(s,k,x)=>{const g=(s.g||{})[k],i=it(k);return i.t=='in'&&typeof g=='string'&&g!==''?g:x[k]};
-  const heads={
-   1:[['B1',cr.univ,'text'],['D1',cr.prog,'text'],['O1',cr.sem,'text']],
-   2:[['E2',cr.code,'text'],['H2',cr.name,'text'],['M2',cr.ch,'auto'],['O2',cr.inst,'text']],
-   4:[['D4',mx('mid'),'number'],['E4',mx('cw'),'number'],['F4',mx('pr'),'number'],['G4',G,'number'],['H4',mx('fin'),'number'],['I4',G+mx('fin'),'number']]
-  };
-  const unyellow={65:47,66:61,67:89,68:48,69:24,70:25,71:26,72:51,73:31,74:34,75:46,76:33,77:28,78:29,79:32,80:0,81:0};
-  const clearManualYellow=row=>row.replace(/(<c\b[^>]*\bs=")(\d+)("[^>]*>)/g,(a,p,n,q)=>unyellow[n]!==undefined?p+unyellow[n]+q:a);
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return cloneState(defaultState);
+    return cleanState(JSON.parse(raw));
+  }catch(e){
+    return cloneState(defaultState);
+  }
+}
+function saveLocal(){
+  let ok=true;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ ok=false; }
+  const warn=document.getElementById("storageWarn");
+  if(warn) warn.style.display = (ok || CLOUD.enabled) ? "none" : "block";
+  return ok;
+}
+function save(){
+  const ok=saveLocal();
+  try{ cloudPush(); }catch(e){ console.error(e); }
+  return ok;
+}
+function currentLab(){ return state.labs.find(l=>l.id===state.currentLabId) || state.labs[0]; }
+function activeStudent(){ return state.students.find(s=>s.id===state.activeStudentId); }
+function money(n){ return "$" + Number(n||0).toFixed(0); }
 
-  xml=xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,rn)=>{
-   const n=+rn;if(heads[n]){for(const [ref,v,k] of heads[n])row=patchCell(row,ref,v,k);return row}
-   if(n<5||n>713)return row;row=clearManualYellow(row);
-   const i=n-5,s=ss[i],x=mc[i];
-   if(s){
-    const ch=[['A'+n,s.sn===''||isNaN(+s.sn)?i+1:+s.sn,'auto'],['B'+n,s.sid??'','text'],['C'+n,s.nm??'','text'],
-     ['D'+n,val(s,m.mid,x),'auto'],['E'+n,val(s,m.cw,x),'auto'],['F'+n,val(s,m.pr,x),'auto'],['H'+n,val(s,m.fin,x),'auto'],
-     ['M'+n,s.st&&s.st!=SL[0]?s.st:'','text']];
-    for(const [ref,v,k] of ch)row=patchCell(row,ref,v,k);
-   }else for(const col of ['A','B','C','D','E','F','H','M'])row=patchCell(row,col+n,'');
-   return row;
+function render(){
+  renderLabs();
+  renderGame();
+  renderScores();
+  renderManage();
+}
+function renderLabs(){
+
+  const selector=document.getElementById("labSelector");
+  if(selector){
+    selector.innerHTML=state.labs.map(l=>
+      `<option value="${l.id}" ${l.id===state.currentLabId?"selected":""}>${escapeHtml(l.name)} — ${l.questions.length} question${l.questions.length===1?"":"s"}</option>`
+    ).join("");
+  }
+}
+function renderGame(){
+  const lab=currentLab();
+  if(!lab) return;
+  document.getElementById("labTitle").textContent=lab.name;
+  document.getElementById("labSub").textContent=lab.note || "Choose a student, then let them pick a mystery dollar card.";
+  document.getElementById("roundBadge").textContent=`Group Round ${lab.round||1}`;
+  document.getElementById("statQuestions").textContent=lab.questions.length;
+  document.getElementById("statRemaining").textContent=lab.questions.filter(q=>!q.used).length;
+  document.getElementById("statStudents").textContent=state.students.length;
+  const a=activeStudent();
+  const box=document.getElementById("activeStudentBox");
+  const btns=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <button class="btn primary" onclick="openPickStudentModal()">${a?"Change student":"Select student"}</button>
+    <button class="btn" onclick="openStudentModal()">+ Create student account</button></div>`;
+  if(a){
+    box.innerHTML=`<span>Active student</span><b>${escapeHtml(a.name)}</b><span>ID: ${escapeHtml(a.studentId)} · Balance: ${money(a.balance)}</span>${btns}`;
+  }else{
+    box.innerHTML=`<span>Active student</span><b>No student selected</b><span>Select a student before opening a card.</span>${btns}`;
+  }
+
+  const cards=document.getElementById("cards");
+  cards.innerHTML="";
+  document.getElementById("emptyBoard").style.display=lab.questions.length?"none":"block";
+  lab.questions.forEach((q,i)=>{
+    const btn=document.createElement("button");
+    btn.className="money-card"+(q.used?" revealed":"");
+    btn.disabled=q.used;
+    btn.innerHTML=`
+      <div class="card-inner">
+        <div class="face front">
+          <div class="question-mark">?</div>
+          <div class="hint">Mystery Cash Card</div>
+        </div>
+        <div class="face back">
+          <div class="value">${money(q.value)}</div>
+          <div class="qtext">${escapeHtml(q.text)}</div>
+          <div class="used-tag">${q.used ? "Already played" : "Tap to play"}</div>
+        </div>
+      </div>`;
+    btn.onclick=()=>openQuestion(q.id);
+    cards.appendChild(btn);
+  });
+}
+function renderScores(){
+  const sorted=[...state.students].sort((a,b)=>b.balance-a.balance || a.name.localeCompare(b.name));
+  document.getElementById("studentCountBadge").textContent=`${sorted.length} student${sorted.length===1?"":"s"}`;
+  const big=document.getElementById("bigScoreList");
+  const rows=sorted.length ? sorted.map((s,i)=>scoreRow(s,i)).join("") :
+    `<div class="empty" style="margin-top:0;padding:24px">No scores yet.</div>`;
+  big.innerHTML=rows;
+}
+function scoreRow(s,i){
+  const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":String(i+1);
+  return `<div class="score-row" data-sid="${s.id}">
+    <div class="rank">${medal}</div><div><div class="student-name">${escapeHtml(s.name)}</div><div class="student-id">${escapeHtml(s.studentId)}</div></div>
+    <div class="cash">${money(s.balance)}</div></div>`;
+}
+function renderManage(){
+  const lab=currentLab(); 
+  if(!lab) return;
+
+  const labOptions=state.labs.map(l=>
+    `<option value="${l.id}" ${l.id===state.currentLabId?"selected":""}>${escapeHtml(l.name)} — ${l.questions.length} question${l.questions.length===1?"":"s"}</option>`
+  ).join("");
+  ["manageLabSelector","questionLabSelector"].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(sel){ sel.innerHTML=labOptions; sel.value=state.currentLabId; }
   });
 
-  const lastDataRow=Math.max(5,4+ss.length);
-  const dynamicCountifRanges=(sheetXml,allowLocal)=>sheetXml.replace(/<f\b([^>]*)>([\s\S]*?)<\/f>/g,(whole,attrs,formula)=>{
-   if(!/\bCOUNTIFS?\s*\(/i.test(formula))return whole;
-   const changed=formula.replace(/((?:'Program_Course Code'!)?)(\$?)([A-Z]{1,3})(\$?)\d+:(\$?)([A-Z]{1,3})(\$?)\d+/g,(ref,prefix,a1,c1,r1,a2,c2,r2)=>{
-    if(c1!==c2)return ref;if(!prefix&&!allowLocal)return ref;
-    return prefix+a1+c1+r1+'5:'+a2+c2+r2+lastDataRow;
-   });
-   return '<f'+attrs+'>'+changed+'</f>';
-  });
-  xml=dynamicCountifRanges(xml,true);
+  document.getElementById("manageCurrentLab").innerHTML=
+    `Editing: <b>${escapeHtml(lab.name)}</b>${lab.note?` · ${escapeHtml(lab.note)}`:""}`;
 
-  const formulaCountAfter=(xml.match(/<f\b/g)||[]).length,rowCountAfter=(xml.match(/<row\b/g)||[]).length;
-  if(formulaCountAfter!==formulaCountBefore)throw new Error('Formula integrity check failed. No Excel file was created.');
-  if(rowCountAfter!==rowCountBefore)throw new Error('Worksheet row integrity check failed. No Excel file was created.');
-  const chk=new DOMParser().parseFromString(xml,'application/xml');
-  if(chk.getElementsByTagName('parsererror').length)throw new Error('Generated worksheet XML is invalid. No Excel file was created.');
-  zip.file(P+'1.xml',xml);
+  const count=document.getElementById("manageLabCount");
+  if(count) count.textContent=`${state.labs.length} lab${state.labs.length===1?"":"s"}`;
 
-  // Update only the COUNTIF/COUNTIFS ranges in the statistic sheets. V10 deliberately
-  // keeps Excel's cached formula results and calcChain intact; the formula cells are
-  // the same cells as in the template and Excel can recalculate them on open.
-  for(let k=2;k<=5;k++){
-   const path=P+k+'.xml',sx=dynamicCountifRanges(await rd(path),false);
-   const parsed=new DOMParser().parseFromString(sx,'application/xml');
-   if(parsed.getElementsByTagName('parsererror').length)throw new Error('Statistics sheet '+k+' became invalid. No Excel file was created.');
-   zip.file(path,sx);
+  const labsEl=document.getElementById("manageLabsList");
+  if(labsEl){
+    labsEl.innerHTML="";
+    state.labs.forEach(l=>{
+      const row=document.createElement("div");
+      row.className="manage-lab-row"+(l.id===state.currentLabId?" current":"");
+      row.innerHTML=`
+        <div>
+          <b>${escapeHtml(l.name)}${l.id===state.currentLabId?'<span class="current-dot">● EDITING</span>':''}</b>
+          <small>${l.questions.length} question${l.questions.length===1?"":"s"} · Group Round ${l.round||1}${l.note?` · ${escapeHtml(l.note)}`:""}</small>
+        </div>
+        <div class="manage-lab-actions">
+          <button class="smallbtn" onclick="selectLabForEditing('${l.id}')">${l.id===state.currentLabId?"Editing":"Edit"}</button>
+          ${state.labs.length>1?`<button class="smallbtn" onclick="deleteLab('${l.id}')">Delete</button>`:""}
+        </div>`;
+      labsEl.appendChild(row);
+    });
   }
 
-  // Append any new strings to the template's Shared String Table. count/uniqueCount are
-  // optional OOXML attributes, so remove them instead of leaving stale values after the
-  // roster was shortened/changed. This is the key Excel-compatibility repair in V10.
-  if(addedStrings.length){
-   const extra=addedStrings.map(v=>'<si><t xml:space="preserve">'+xe(v)+'</t></si>').join('');
-   sstXml=sstXml.replace(/<\/sst>\s*$/,extra+'</sst>');
+  const el=document.getElementById("manageQuestions");
+  el.innerHTML="";
+  if(!lab.questions.length){ 
+    el.innerHTML=`<p style="color:#9aa7c7">No questions yet in <b>${escapeHtml(lab.name)}</b>.</p>`; 
+  } else {
+    lab.questions.forEach((q,i)=>{
+      const d=document.createElement("div");
+      d.className="score-row"; 
+      d.style.gridTemplateColumns="34px 1fr";
+      d.innerHTML=`<div class="rank">${i+1}</div><div><div class="student-name">${escapeHtml(q.text)}</div><div class="student-id">${money(q.value)}</div>
+        ${thumbHtml(q)}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+          <button class="smallbtn" onclick="pickImageFor('${q.id}')">📷 ${q.imageId?"Change picture":"Add picture"}</button>
+          ${q.imageId?`<button class="smallbtn" onclick="removeQuestionImage('${q.id}')">Remove picture</button>`:""}
+          <button class="smallbtn" onclick="removeQuestion('${q.id}')">Remove question</button>
+        </div></div>`;
+      el.appendChild(d);
+    });
   }
-  sstXml=sstXml.replace(/(<sst\b[^>]*?)\s+count="[^"]*"/,'$1').replace(/(<sst\b[^>]*?)\s+uniqueCount="[^"]*"/,'$1');
-  const sstCheck=new DOMParser().parseFromString(sstXml,'application/xml');
-  if(sstCheck.getElementsByTagName('parsererror').length)throw new Error('Generated sharedStrings.xml is invalid. No Excel file was created.');
-  zip.file(sstPath,sstXml);
-
-  // Keep the original calcChain and package relationships. We only request a fresh
-  // calculation; we do not delete Excel package parts or cached results.
-  const wbPath='xl/workbook.xml',wbFile=zip.file(wbPath);if(wbFile){let wx=await wbFile.async('string');if(/<calcPr\b[^>]*\/>/.test(wx))wx=wx.replace(/<calcPr\b([^>]*)\/>/,(a,x)=>'<calcPr'+x.replace(/\s+(calcMode|fullCalcOnLoad|forceFullCalc|calcOnSave)="[^"]*"/g,'')+' calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/>');else wx=wx.replace('</workbook>','<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1" calcOnSave="1"/></workbook>');zip.file(wbPath,wx)}
-
-  const out=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6},platform:'DOS'}),b=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a'),url=URL.createObjectURL(b);
-  a.href=url;a.download=(cr.code||'Course')+'_Course_Grading.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
- }catch(e){console.error(e);alert('LabTrack v19 — Excel export failed safely: '+e.message)}
 }
-boot();
-</script></body></html>
+
+function switchLab(id){
+  if(!state.labs.some(l=>l.id===id)) return;
+  state.currentLabId=id;
+  state.activeStudentId=null;
+  save();
+  showView("game");
+  render();
+}
+
+function selectLabForEditing(id){
+  if(!state.labs.some(l=>l.id===id)) return;
+  state.currentLabId=id;
+  state.activeStudentId=null;
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+  toast(`${currentLab().name} selected for editing.`);
+}
+function openLabFromTools(id){
+  selectLabForEditing(id);
+}
+function deleteLab(id){
+  const lab=state.labs.find(l=>l.id===id);
+  if(!lab || state.labs.length<=1) return;
+  if(!confirm(`Delete ${lab.name}?\n\nThis removes the lab and its questions for every instructor. Student account history already earned will remain.`)) return;
+  lab.questions.forEach(q=>{ if(q.imageId) imgDelete(q.imageId); });
+  state.labs=state.labs.filter(l=>l.id!==id);
+  if(state.currentLabId===id) state.currentLabId=state.labs[0].id;
+  state.activeStudentId=null;
+  save();
+  render();
+  toast(`${lab.name} deleted.`);
+}
+
+function openStudentModal(){ document.getElementById("studentModal").classList.add("show"); setTimeout(()=>studentName.focus(),100); }
+function openManageModal(){ renderManage(); document.getElementById("manageModal").classList.add("show"); }
+function closeModal(id){ document.getElementById(id).classList.remove("show"); }
+
+function createStudent(){
+  const name=document.getElementById("studentName").value.trim();
+  const sid=document.getElementById("studentId").value.trim();
+  if(!name || !sid){ toast("Please enter both student name and ID."); return; }
+  if(state.students.some(s=>s.studentId.toLowerCase()===sid.toLowerCase())){ toast("This student ID already has an account."); return; }
+  const s={id:"s"+Date.now(),name,studentId:sid,balance:0,history:[]};
+  state.students.push(s); state.activeStudentId=s.id; save();
+  document.getElementById("studentName").value="";
+  document.getElementById("studentId").value="";
+  closeModal("studentModal"); render(); toast(`${name}'s account is ready.`);
+}
+function openPickStudentModal(){
+  if(!state.students.length){ openStudentModal(); toast("Create a student account first."); return; }
+  document.getElementById("pickSearch").value="";
+  renderPickList();
+  document.getElementById("pickStudentModal").classList.add("show");
+  setTimeout(()=>document.getElementById("pickSearch").focus(),100);
+}
+function pickMatches(){
+  const q=document.getElementById("pickSearch").value.trim().toLowerCase();
+  const list=[...state.students].sort((x,y)=>x.name.localeCompare(y.name));
+  return q ? list.filter(s=>s.name.toLowerCase().includes(q)||String(s.studentId).toLowerCase().includes(q)) : list;
+}
+function renderPickList(){
+  const m=pickMatches();
+  document.getElementById("pickList").innerHTML = m.length
+    ? m.map(s=>`<button class="pick-item${s.id===state.activeStudentId?" current":""}" onclick="chooseStudent('${s.id}')"><span><b>${escapeHtml(s.name)}</b><small>ID: ${escapeHtml(s.studentId)}</small></span><span class="cash">${money(s.balance)}</span></button>`).join("")
+    : `<div class="empty" style="padding:20px;margin:0">No student matches.</div>`;
+}
+function pickFirstMatch(){ const m=pickMatches(); if(m.length===1) chooseStudent(m[0].id); }
+function chooseStudent(id){ state.activeStudentId=id; save(); closeModal("pickStudentModal"); render(); }
+function openQuestion(qid){
+  const student=activeStudent();
+  if(!student){ openPickStudentModal(); return; }
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===qid);
+  if(!q || q.used) return;
+  activeQuestionId=qid;
+  document.getElementById("questionLabBadge").textContent=lab.name.toUpperCase();
+  document.getElementById("questionValue").textContent=money(q.value);
+  document.getElementById("questionText").textContent=q.text;
+  updateQuestionImage();
+  document.getElementById("questionStudent").innerHTML=`<span>Playing now</span><b>${escapeHtml(student.name)}</b><span>ID: ${escapeHtml(student.studentId)} · Current balance: ${money(student.balance)}</span>`;
+  document.getElementById("questionModal").classList.add("show");
+}
+function gradeAnswer(correct){
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===activeQuestionId);
+  const s=activeStudent();
+  if(!q || !s) return;
+  q.used=true;
+  const txn={
+    id:"t"+Date.now(),
+    labId:lab.id,
+    labName:lab.name,
+    round:lab.round||1,
+    question:q.text,
+    value:q.value,
+    correct:!!correct,
+    timestamp:new Date().toISOString()
+  };
+  s.history=s.history||[];
+  s.history.unshift(txn);
+  if(correct) s.balance=Number(s.balance||0)+Number(q.value||0);
+  save();
+  closeModal("questionModal");
+  activeQuestionId=null;
+  render();
+  let fun=false;
+  try{ fun=!!window.playFun && playFun(!!correct,q.value,s.name); }catch(e){ fun=false; }
+  if(correct){ if(!fun){ successSound(); celebrate(q.value); } }
+  else { if(!fun) failSound(); toast(`Incorrect — no deposit. ${s.name} remains at ${money(s.balance)}.`); }
+}
+function restartBoard(){
+  const lab=currentLab();
+  if(!lab) return;
+  if(!confirm(`Restart ${lab.name} for a new student group?\n\nThis will make all question cards available again. Student balances and account histories will stay unchanged.`)) return;
+  lab.questions.forEach(q=>q.used=false);
+  lab.round=(lab.round||1)+1;
+  state.activeStudentId=null;
+  save(); render(); toast(`${lab.name} restarted for Group Round ${lab.round}.`);
+}
+function createLab(){
+  const name=document.getElementById("newLabName").value.trim();
+  const note=document.getElementById("newLabNote").value.trim();
+  if(!name){ toast("Enter a lab name."); return; }
+
+  const id="lab"+Date.now();
+  state.labs.push({id,name,note,round:1,questions:[]});
+  state.currentLabId=id;
+  state.activeStudentId=null;
+
+  document.getElementById("newLabName").value="";
+  document.getElementById("newLabNote").value="";
+
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+
+  toast(`${name} created. It is now selected for editing.`);
+}
+function addQuestion(){
+  const lab=currentLab();
+  if(!lab){ toast("Choose a lab first."); return; }
+
+  const text=document.getElementById("newQuestionText").value.trim();
+  const value=Number(document.getElementById("newQuestionValue").value);
+
+  if(!text || !value || value<1){
+    toast("Enter a question and a positive dollar value.");
+    return;
+  }
+
+  const newQ={
+    id:"q"+Date.now(),
+    text,
+    value:Math.round(value),
+    used:false
+  };
+  if(pendingNewImage){
+    newQ.imageId="img"+Date.now()+Math.random().toString(36).slice(2,6);
+    imgPut(newQ.imageId,pendingNewImage);
+    pendingNewImage=null; renderNewImagePreview();
+  }
+  lab.questions.push(newQ);
+
+  document.getElementById("newQuestionText").value="";
+  document.getElementById("newQuestionValue").value="";
+
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+
+  toast(`Question added to ${lab.name}.`);
+}
+function removeQuestion(qid){
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===qid);
+  if(!q) return;
+  if(!confirm(`Remove this question?\n\n"${q.text}"`)) return;
+  if(q.imageId) imgDelete(q.imageId);
+  lab.questions=lab.questions.filter(x=>x.id!==qid);
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+}
+function openAccount(id){
+  const s=state.students.find(x=>x.id===id); if(!s)return;
+  document.getElementById("accountTitle").textContent=s.name;
+  document.getElementById("accountMeta").textContent=`Student ID: ${s.studentId}`;
+  document.getElementById("accountBalance").textContent=money(s.balance);
+  accountEditingId=id;
+  document.getElementById("editStudentName").value=s.name;
+  document.getElementById("editStudentId").value=s.studentId;
+  document.getElementById("editStudentBalance").value=Math.round(Number(s.balance)||0);
+  const hist=s.history||[];
+  const played=hist.filter(x=>x.type!=="adjust");
+  const correct=played.filter(x=>x.correct).length;
+  document.getElementById("accountStats").innerHTML=`<span class="badge">${correct} correct / ${played.length} played</span>`;
+  const el=document.getElementById("accountHistory");
+  if(!hist.length){ el.innerHTML=`<div class="empty" style="padding:25px">No game history yet.</div>`; }
+  else{
+    el.innerHTML=hist.map(h=>{
+      if(h.type==="adjust"){
+        const v=Number(h.value)||0;
+        return `<div class="score-row" style="grid-template-columns:34px 1fr auto;margin-bottom:8px">
+      <div class="rank">✎</div>
+      <div><div class="student-name">Instructor adjustment</div><div class="student-id">${escapeHtml(h.question)}</div></div>
+      <div class="${v>0?"cash":""}">${v>0?"+":v<0?"−":""}${money(Math.abs(v))}</div>
+    </div>`;
+      }
+      return `<div class="score-row" style="grid-template-columns:34px 1fr auto;margin-bottom:8px">
+      <div class="rank">${h.correct?"✓":"✕"}</div>
+      <div><div class="student-name">${escapeHtml(h.labName)} · Round ${h.round}</div><div class="student-id">${escapeHtml(h.question)}</div></div>
+      <div class="${h.correct?"cash":""}">${h.correct?"+":""}${money(h.correct?h.value:0)}</div>
+    </div>`;
+    }).join("");
+  }
+  document.getElementById("accountModal").classList.add("show");
+}
+function saveStudentEdits(){
+  const s=state.students.find(x=>x.id===accountEditingId);
+  if(!s){ toast("This student no longer exists."); closeModal("accountModal"); return; }
+  const name=document.getElementById("editStudentName").value.trim();
+  const sid=document.getElementById("editStudentId").value.trim();
+  const raw=document.getElementById("editStudentBalance").value.trim();
+  const newBal=Math.round(Number(raw));
+  if(!name || !sid){ toast("Please enter both the name and the ID."); return; }
+  if(raw==="" || !isFinite(newBal) || newBal<0){ toast("Enter a balance of 0 or more."); return; }
+  if(state.students.some(x=>x.id!==s.id && x.studentId.toLowerCase()===sid.toLowerCase())){ toast("Another student already has this ID."); return; }
+  const oldBal=Math.round(Number(s.balance)||0);
+  s.name=name; s.studentId=sid;
+  if(newBal!==oldBal){
+    s.history=s.history||[];
+    s.history.unshift({
+      id:"t"+Date.now(), type:"adjust", labId:"", labName:"Instructor adjustment", round:0,
+      question:`Balance changed from ${money(oldBal)} to ${money(newBal)}`,
+      value:newBal-oldBal, correct:false, timestamp:new Date().toISOString()
+    });
+    s.balance=newBal;
+  }
+  save(); render(); openAccount(s.id);
+  toast("Student updated.");
+}
+function deleteStudent(id){
+  const s=state.students.find(x=>x.id===id);
+  if(!s) return;
+  if(!confirm(`Delete ${s.name} (${s.studentId})?\n\nThe account, balance and history are removed for every instructor. This cannot be undone.`)) return;
+  state.students=state.students.filter(x=>x.id!==id);
+  if(state.activeStudentId===id) state.activeStudentId=null;
+  accountEditingId=null;
+  save(); closeModal("accountModal"); render();
+  toast(`${s.name} deleted.`);
+}
+function showView(v){
+  ["game","scores"].forEach(x=>{
+    document.getElementById(x+"View").style.display=x===v?"block":"none";
+    document.getElementById("nav"+x[0].toUpperCase()+x.slice(1)).classList.toggle("active",x===v);
+  });
+}
+function toggleFullscreen(){
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+function celebrate(value){
+  const wrap=document.getElementById("celebration");
+  document.getElementById("celebrateCash").textContent=`+${money(value)} deposited`;
+  wrap.classList.add("show");
+  const colors=["#ffcf5a","#38d98a","#6da8ff","#ff6b9d","#ffffff"];
+  for(let i=0;i<85;i++){
+    const c=document.createElement("div"); c.className="confetti";
+    c.style.left=Math.random()*100+"vw";
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDelay=(Math.random()*.45)+"s";
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    wrap.appendChild(c);
+    setTimeout(()=>c.remove(),2800);
+  }
+  setTimeout(()=>wrap.classList.remove("show"),2200);
+}
+function audioCtx(){
+  const A=window.AudioContext||window.webkitAudioContext;
+  return A ? new A() : null;
+}
+function successSound(){
+  const ctx=audioCtx(); if(!ctx)return;
+  const notes=[523.25,659.25,783.99,1046.5];
+  notes.forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type="sine";
+    const t=ctx.currentTime+i*.11;g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.18,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.start(t);o.stop(t+.25);
+  });
+}
+function failSound(){
+  const ctx=audioCtx(); if(!ctx)return;
+  [220,165].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type="sawtooth";
+    const t=ctx.currentTime+i*.18;g.gain.setValueAtTime(.11,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);o.start(t);o.stop(t+.21);
+  });
+}
+function toast(msg){
+  const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.classList.remove("show"),2800);
+}
+function escapeHtml(s){
+  return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+document.querySelectorAll(".modal-backdrop").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
+
+/* =====================================================================
+   CLOUD SYNC (Firebase) — shares labs, questions and student accounts
+   between instructors. Leave the PASTE_ values as they are to run the
+   game on this phone only (no sync).
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDCo7K7jnXaAGfG85EZhH3UdSe8W5tkv0I",
+  authDomain: "lab-cash-challenge.firebaseapp.com",
+  projectId: "lab-cash-challenge",
+  storageBucket: "lab-cash-challenge.firebasestorage.app",
+  messagingSenderId: "165043679115",
+  appId: "1:165043679115:web:a75114d3ee4edf5517898e"
+};
+// The one shared instructor account. Create it in Firebase with this email
+// and the instructor PIN as its password. It can be any made-up email.
+const INSTRUCTOR_EMAIL = "instructor@labcash.app";
+const FB_BASE = "https://www.gstatic.com/firebasejs/12.16.0/";
+const COLL = {labs:"lcc_labs", students:"lcc_students"};
+const CLOUD = {
+  enabled:false, failed:false, ready:false, user:null,
+  auth:null, authM:null, db:null, fs:null,
+  unsubs:[], remote:{labs:null,students:null}, sig:{labs:"",students:""},
+  sent:{labs:{},students:{}}, pending:{labs:false,students:false}
+};
+
+function cloudConfigured(){
+  const c=FIREBASE_CONFIG;
+  return !!(c.apiKey && c.projectId && !/^PASTE/i.test(c.apiKey) && !/^PASTE/i.test(c.projectId));
+}
+
+// Same text for the same data, whatever the key order
+function canon(v){
+  if(Array.isArray(v)) return "["+v.map(canon).join(",")+"]";
+  if(v && typeof v==="object"){
+    return "{"+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+":"+canon(v[k])).join(",")+"}";
+  }
+  return JSON.stringify(v);
+}
+function plain(o){ return JSON.parse(JSON.stringify(o)); }
+function mapSig(arr){ const m={}; arr.forEach(e=>{ m[e.id]=canon(plain(e)); }); return canon(m); }
+function byOrd(a,b){
+  const x=typeof a._ord==="number"?a._ord:Infinity, y=typeof b._ord==="number"?b._ord:Infinity;
+  if(x!==y) return x<y?-1:1;
+  return String(a.id)<String(b.id)?-1:1;
+}
+function fixSelection(){
+  if(!state.labs.some(l=>l.id===state.currentLabId)) state.currentLabId=state.labs[0].id;
+  if(state.activeStudentId && !state.students.some(s=>s.id===state.activeStudentId)) state.activeStudentId=null;
+}
+
+/* ---------- screen messages ---------- */
+function updateCloudStatus(){
+  const el=document.getElementById("cloudPill"); if(!el) return;
+  let s="off", text="";
+  if(CLOUD.enabled){
+    if(CLOUD.failed){ s="error"; text="☁ Not connected"; }
+    else if(!CLOUD.ready){ s="connecting"; text="☁ Connecting…"; }
+    else if(!navigator.onLine){ s="offline"; text="☁ Offline — will sync later"; }
+    else if(CLOUD.pending.labs||CLOUD.pending.students){ s="saving"; text="☁ Saving…"; }
+    else { s="synced"; text="☁ Synced"; }
+  }
+  el.className="cloud-pill"+(s==="off"?"":" "+s);
+  el.style.display = s==="off" ? "none" : "inline-flex";
+  el.textContent=text;
+  const card=document.getElementById("cloudCard");
+  if(card){
+    card.style.display = (CLOUD.enabled && CLOUD.user) ? "block" : "none";
+  }
+}
+function showBanner(msg){
+  const b=document.getElementById("cloudBanner"); if(!b) return;
+  b.textContent=msg||""; b.style.display=msg?"block":"none";
+}
+function showLock(mode,msg){
+  document.body.classList.add("cloud-locked");
+  document.getElementById("loginLoading").style.display = mode==="loading" ? "block" : "none";
+  document.getElementById("loginForm").style.display = mode==="form" ? "block" : "none";
+  if(mode==="loading") document.getElementById("loginLoadingText").textContent=msg||"Loading…";
+}
+function hideLock(){ document.body.classList.remove("cloud-locked"); }
+function setLoginError(msg){ const e=document.getElementById("loginError"); e.textContent=msg||""; e.style.display=msg?"block":"none"; }
+
+/* ---------- sign in / out ---------- */
+function friendlyAuthError(e){
+  const c=(e&&e.code)||"";
+  if(["auth/invalid-credential","auth/wrong-password","auth/user-not-found","auth/invalid-email"].includes(c)) return "Wrong PIN.";
+  if(c==="auth/too-many-requests") return "Too many tries. Wait a few minutes, then try again.";
+  if(c==="auth/network-request-failed") return "No internet connection.";
+  if(c==="auth/operation-not-allowed") return "Email and password sign-in is not turned on in Firebase.";
+  return "Could not unlock"+(c?" ("+c+")":"")+".";
+}
+async function cloudSignIn(){
+  if(!CLOUD.authM){ setLoginError("Still connecting. Wait a moment and try again."); return; }
+  const pin=document.getElementById("loginPin").value.trim();
+  if(!pin){ setLoginError("Enter the PIN."); return; }
+  if(pin.length<6){ setLoginError("The PIN has at least 6 digits."); return; }
+  const btn=document.getElementById("loginBtn");
+  btn.disabled=true; setLoginError("");
+  try{ await CLOUD.authM.signInWithEmailAndPassword(CLOUD.auth,INSTRUCTOR_EMAIL,pin); }
+  catch(e){ setLoginError(friendlyAuthError(e)); }
+  btn.disabled=false;
+}
+async function cloudSignOut(){
+  if(!CLOUD.authM) return;
+  if(!confirm("Lock this phone? You will need the PIN to open the game again.")) return;
+  closeModal("manageModal");
+  try{ await CLOUD.authM.signOut(CLOUD.auth); }catch(e){ console.error(e); }
+}
+
+/* ---------- listening to the cloud ---------- */
+function stopListening(){
+  CLOUD.unsubs.forEach(u=>{ try{u();}catch(e){} });
+  CLOUD.unsubs=[]; CLOUD.ready=false; imgClearAll();
+  CLOUD.remote={labs:null,students:null}; CLOUD.sig={labs:"",students:""};
+  CLOUD.sent={labs:{},students:{}}; CLOUD.pending={labs:false,students:false};
+}
+function startListening(){
+  stopListening();
+  ["labs","students"].forEach(kind=>{
+    const u=CLOUD.fs.onSnapshot(
+      CLOUD.fs.collection(CLOUD.db,COLL[kind]),
+      {includeMetadataChanges:true},
+      snap=>onRemote(kind,snap),
+      err=>onCloudError(err)
+    );
+    CLOUD.unsubs.push(u);
+  });
+  CLOUD.unsubs.push(CLOUD.fs.onSnapshot(CLOUD.fs.collection(CLOUD.db,IMG_COLL), onRemoteImages, err=>onCloudError(err)));
+}
+function onRemote(kind,snap){
+  CLOUD.pending[kind]=!!(snap.metadata && snap.metadata.hasPendingWrites);
+  const arr=[], sent={};
+  snap.forEach(d=>{ const data=d.data(); data.id=d.id; arr.push(data); sent[d.id]=canon(data); });
+  const sig=canon(sent);
+  const changed = sig!==CLOUD.sig[kind];
+  CLOUD.sig[kind]=sig;
+  CLOUD.remote[kind]=arr;
+  if(!CLOUD.ready){
+    if(CLOUD.remote.labs!==null && CLOUD.remote.students!==null) cloudFirstReconcile();
+  }else if(changed){
+    CLOUD.sent[kind]=sent;
+    applyRemote(kind);
+  }
+  updateCloudStatus();
+}
+function applyRemote(kind){
+  const incoming=CLOUD.remote[kind].map(kind==="labs"?cleanLab:cleanStudent).sort(byOrd);
+  if(kind==="labs" && !incoming.length) return;           // never leave the game without a lab
+  if(mapSig(incoming)===mapSig(state[kind])) return;      // nothing new (it was our own change)
+  state[kind]=incoming;
+  fixSelection(); saveLocal(); render();
+  cloudPush();                                            // repairs anything the cleaning changed
+}
+// The first time this phone connects
+function cloudFirstReconcile(){
+  const key="lcc_linked_"+FIREBASE_CONFIG.projectId;
+  let linked=false;
+  try{ linked = localStorage.getItem(key)==="1"; }catch(e){ linked=true; }   // cannot remember -> cloud wins
+  ["labs","students"].forEach(kind=>{
+    const clean=kind==="labs"?cleanLab:cleanStudent;
+    const remoteArr=CLOUD.remote[kind].map(clean);
+    const ids=new Set(remoteArr.map(e=>e.id));
+    let merged=remoteArr.slice();
+    // First connection ever: keep what is already on this phone and upload it
+    if(!linked) state[kind].forEach(e=>{ if(!ids.has(e.id)) merged.push(e); });
+    if(kind==="labs" && !merged.length) merged=state.labs.slice();
+    state[kind]=merged.sort(byOrd);
+    CLOUD.sent[kind]={};
+    CLOUD.remote[kind].forEach(d=>{ CLOUD.sent[kind][d.id]=canon(d); });
+  });
+  try{ localStorage.setItem(key,"1"); }catch(e){}
+  CLOUD.ready=true;
+  fixSelection(); saveLocal(); hideLock(); render(); cloudPush();
+}
+
+/* ---------- sending changes to the cloud ---------- */
+function cloudPush(){
+  if(!CLOUD.ready) return;
+  ["labs","students"].forEach(kind=>{
+    const seen={};
+    state[kind].forEach((e,i)=>{
+      if(typeof e._ord!=="number") e._ord=Date.now()+i;
+      const data=plain(e), c=canon(data);
+      seen[e.id]=true;
+      if(CLOUD.sent[kind][e.id]!==c){
+        CLOUD.sent[kind][e.id]=c;
+        CLOUD.fs.setDoc(CLOUD.fs.doc(CLOUD.db,COLL[kind],String(e.id)),data).catch(onCloudError);
+      }
+    });
+    Object.keys(CLOUD.sent[kind]).forEach(id=>{
+      if(!seen[id]){
+        delete CLOUD.sent[kind][id];
+        CLOUD.fs.deleteDoc(CLOUD.fs.doc(CLOUD.db,COLL[kind],String(id))).catch(onCloudError);
+      }
+    });
+  });
+}
+function onCloudError(err){
+  console.error("Cloud error:",err);
+  const c=(err&&err.code)||"";
+  if(c.includes("permission-denied")) showBanner("The cloud refused this action. Check that your account was added and that the Firestore rules were published.");
+  else if(c.includes("unavailable")||c.includes("network")) showBanner("");
+  else showBanner("Cloud problem"+(c?" ("+c+")":"")+". Changes may not be shared.");
+}
+
+/* ---------- start ---------- */
+function onAuthChange(user){
+  CLOUD.user=user||null;
+  setLoginError("");
+  document.getElementById("loginPin").value="";
+  if(user){
+    showLock("loading","Loading your labs…");
+    clearTimeout(window.__lockTimer);
+    window.__lockTimer=setTimeout(()=>{ if(!CLOUD.ready) document.getElementById("loginLoadingText").textContent="Taking long. Check your internet connection."; },9000);
+    startListening();
+  }else{
+    stopListening();
+    showLock("form");
+  }
+  updateCloudStatus();
+}
+async function cloudInit(){
+  if(!cloudConfigured()) return;
+  CLOUD.enabled=true;
+  showLock("loading","Connecting…");
+  updateCloudStatus();
+  window.addEventListener("online",updateCloudStatus);
+  window.addEventListener("offline",updateCloudStatus);
+  document.getElementById("loginPin").addEventListener("keydown",e=>{ if(e.key==="Enter") cloudSignIn(); });
+  try{
+    const [appM,authM,fsM]=await Promise.all([
+      import(FB_BASE+"firebase-app.js"),
+      import(FB_BASE+"firebase-auth.js"),
+      import(FB_BASE+"firebase-firestore.js")
+    ]);
+    const app=appM.initializeApp(FIREBASE_CONFIG);
+    CLOUD.authM=authM; CLOUD.fs=fsM; CLOUD.auth=authM.getAuth(app);
+    try{
+      CLOUD.db=fsM.initializeFirestore(app,{localCache:fsM.persistentLocalCache({tabManager:fsM.persistentMultipleTabManager()})});
+    }catch(e){ CLOUD.db=fsM.getFirestore(app); }
+    authM.onAuthStateChanged(CLOUD.auth,onAuthChange,onCloudError);
+  }catch(e){
+    console.error(e);
+    CLOUD.failed=true; hideLock(); updateCloudStatus();
+    showBanner("Cannot reach the cloud. The game works on this phone only, and your changes will NOT be shared. Connect to the internet and reload the page.");
+  }
+}
+
+
+/* =====================================================================
+   QUESTION PICTURES
+   Pictures are shrunk on the phone, then saved in their own cloud
+   collection (lcc_images), one document per picture. They are NOT stored
+   inside the lab, so labs stay small and fast.
+   ===================================================================== */
+const IMAGES = {};
+const IMG_LOCAL_KEY = "labCashChallenge_images_v1";
+const IMG_COLL = "lcc_images";
+const IMG_MAX_CHARS = 380000;                 // keeps each picture far below Firestore's 1 MB limit
+const IMG_OK = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
+let pendingNewImage = null;                   // picture chosen in the Add question box
+let imageTarget = null;                       // {labId, qid} while changing a picture of an existing question
+let imagesSig = "";
+
+function imgUsesCloud(){ return CLOUD.enabled && !CLOUD.failed && CLOUD.ready; }
+function loadLocalImages(){
+  try{
+    const o=JSON.parse(localStorage.getItem(IMG_LOCAL_KEY)||"{}");
+    Object.keys(o).forEach(k=>{ if(typeof o[k]==="string" && IMG_OK.test(o[k])) IMAGES[k]=o[k]; });
+  }catch(e){}
+}
+function persistLocalImages(){
+  try{ localStorage.setItem(IMG_LOCAL_KEY, JSON.stringify(IMAGES)); return true; }
+  catch(e){ toast("This phone has no space to save the picture."); return false; }
+}
+function imgPut(id,data){
+  IMAGES[id]=data;
+  if(imgUsesCloud()){
+    CLOUD.fs.setDoc(CLOUD.fs.doc(CLOUD.db,IMG_COLL,id),{data}).catch(onCloudError);
+  }else persistLocalImages();
+}
+function imgDelete(id){
+  if(!id) return;
+  delete IMAGES[id];
+  if(imgUsesCloud()){
+    CLOUD.fs.deleteDoc(CLOUD.fs.doc(CLOUD.db,IMG_COLL,id)).catch(onCloudError);
+  }else persistLocalImages();
+}
+function imgClearAll(){ Object.keys(IMAGES).forEach(k=>delete IMAGES[k]); imagesSig=""; }
+
+// Called by the cloud listener whenever the pictures in the cloud change
+function onRemoteImages(snap){
+  const m={};
+  snap.forEach(d=>{ const v=d.data()&&d.data().data; if(typeof v==="string" && IMG_OK.test(v)) m[d.id]=v; });
+  const sig=Object.keys(m).sort().map(k=>k+":"+m[k].length).join("|");
+  if(sig===imagesSig) return;
+  imagesSig=sig;
+  imgClearAll(); imagesSig=sig;
+  Object.assign(IMAGES,m);
+  updateQuestionImage();
+  if(document.getElementById("manageModal").classList.contains("show")) renderManage();
+}
+
+/* ---------- shrinking a picture ---------- */
+function fileToDataUrl(file){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error("read")); r.readAsDataURL(file); });
+}
+function loadImageEl(src){
+  return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("decode")); im.src=src; });
+}
+async function compressImage(file){
+  if(!file || !/^image\//.test(file.type||"")) throw new Error("notimage");
+  const im=await loadImageEl(await fileToDataUrl(file));
+  const W=im.naturalWidth||im.width, H=im.naturalHeight||im.height;
+  if(!W || !H) throw new Error("decode");
+  let maxSide=1000, q=0.8;
+  for(let i=0;i<7;i++){
+    const sc=Math.min(1,maxSide/Math.max(W,H));
+    const c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(W*sc)); c.height=Math.max(1,Math.round(H*sc));
+    const ctx=c.getContext("2d");
+    ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,c.width,c.height);   // so see-through PNGs do not turn black
+    ctx.drawImage(im,0,0,c.width,c.height);
+    const out=c.toDataURL("image/jpeg",q);
+    if(IMG_OK.test(out) && out.length<=IMG_MAX_CHARS) return out;
+    maxSide=Math.round(maxSide*0.8); q=Math.max(0.5,q-0.06);
+  }
+  throw new Error("toobig");
+}
+function imageErrorText(e){
+  const m=e&&e.message;
+  if(m==="notimage") return "Please choose a picture file (JPG or PNG).";
+  if(m==="toobig") return "This picture is too big. Try a smaller one.";
+  return "This picture could not be opened. Try a JPG or PNG.";
+}
+
+/* ---------- showing pictures ---------- */
+function questionImageHtml(q){
+  if(!q || !q.imageId) return "";
+  const src=IMAGES[q.imageId];
+  if(src) return `<img class="q-img" src="${src}" alt="Question picture" onclick="openLightbox('${q.imageId}')">`;
+  return `<div class="q-img-loading">${CLOUD.failed ? "Picture unavailable (no connection)" : "Loading picture…"}</div>`;
+}
+function thumbHtml(q){
+  if(!q || !q.imageId) return "";
+  const src=IMAGES[q.imageId];
+  return src ? `<img class="q-thumb" src="${src}" alt="Question picture" onclick="openLightbox('${q.imageId}')">` : `<div class="student-id" style="margin-top:6px">Loading picture…</div>`;
+}
+function updateQuestionImage(){
+  const wrap=document.getElementById("questionImageWrap"); if(!wrap) return;
+  if(!activeQuestionId){ wrap.innerHTML=""; return; }
+  const lab=currentLab();
+  const q=lab && lab.questions.find(x=>x.id===activeQuestionId);
+  wrap.innerHTML=questionImageHtml(q);
+}
+function openLightbox(id){
+  const src=IMAGES[id]; if(!src) return;
+  document.getElementById("lightboxImg").src=src;
+  document.getElementById("lightbox").classList.add("show");
+}
+function closeLightbox(){
+  document.getElementById("lightbox").classList.remove("show");
+  document.getElementById("lightboxImg").removeAttribute("src");
+}
+
+/* ---------- picture for a NEW question ---------- */
+async function pickNewQuestionImage(input){
+  const f=input.files && input.files[0];
+  input.value="";
+  if(!f) return;
+  toast("Preparing picture…");
+  try{ pendingNewImage=await compressImage(f); }
+  catch(e){ toast(imageErrorText(e)); return; }
+  renderNewImagePreview();
+  toast("Picture ready. Now tap + Add Question.");
+}
+function clearNewQuestionImage(){ pendingNewImage=null; renderNewImagePreview(); }
+function renderNewImagePreview(){
+  const box=document.getElementById("newQuestionImagePreview"); if(!box) return;
+  box.innerHTML = pendingNewImage
+    ? `<img class="q-thumb" src="${pendingNewImage}" alt="Picture preview"><div style="margin-top:8px"><button class="smallbtn" onclick="clearNewQuestionImage()">Remove picture</button></div>`
+    : "";
+}
+
+/* ---------- picture for an EXISTING question ---------- */
+function pickImageFor(qid){
+  const lab=currentLab(); if(!lab) return;
+  imageTarget={labId:lab.id,qid};
+  document.getElementById("qImagePicker").click();
+}
+async function onQuestionImagePicked(input){
+  const f=input.files && input.files[0];
+  input.value="";
+  const t=imageTarget; imageTarget=null;
+  if(!f || !t) return;
+  toast("Preparing picture…");
+  let data;
+  try{ data=await compressImage(f); }
+  catch(e){ toast(imageErrorText(e)); return; }
+  const lab=state.labs.find(l=>l.id===t.labId);
+  const q=lab && lab.questions.find(x=>x.id===t.qid);
+  if(!q){ toast("That question no longer exists."); return; }
+  const old=q.imageId;
+  q.imageId="img"+Date.now()+Math.random().toString(36).slice(2,6);
+  imgPut(q.imageId,data);
+  if(old) imgDelete(old);
+  save(); renderManage();
+  toast("Picture saved.");
+}
+function removeQuestionImage(qid){
+  const lab=currentLab();
+  const q=lab && lab.questions.find(x=>x.id===qid);
+  if(!q || !q.imageId) return;
+  imgDelete(q.imageId);
+  delete q.imageId;
+  save(); renderManage();
+  toast("Picture removed.");
+}
+
+if(!cloudConfigured()) loadLocalImages();
+if(cloudConfigured()) document.body.classList.add("cloud-locked");
+render();
+cloudInit();
+</script>
+
+<div id="funStage" onclick="stopFun()"></div>
+<script>
+/* Press and hold a student on the Live Score page to edit or remove them */
+(function(){
+  var list=document.getElementById("bigScoreList"); if(!list) return;
+  var timer=null, sx=0, sy=0;
+  function unpress(){ var r=list.querySelectorAll(".pressing"); for(var i=0;i<r.length;i++) r[i].classList.remove("pressing"); }
+  function cancel(){ clearTimeout(timer); timer=null; unpress(); }
+  function rowOf(e){ return e.target && e.target.closest ? e.target.closest("[data-sid]") : null; }
+  list.addEventListener("pointerdown",function(e){
+    var r=rowOf(e); if(!r) return;
+    cancel(); sx=e.clientX; sy=e.clientY; r.classList.add("pressing");
+    var id=r.getAttribute("data-sid");
+    timer=setTimeout(function(){ timer=null; unpress(); try{ if(navigator.vibrate) navigator.vibrate(35); }catch(x){} openAccount(id); },550);
+  });
+  list.addEventListener("pointermove",function(e){ if(timer && (Math.abs(e.clientX-sx)>10 || Math.abs(e.clientY-sy)>10)) cancel(); });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){ list.addEventListener(ev,cancel); });
+  list.addEventListener("contextmenu",function(e){
+    var r=rowOf(e); if(!r) return;
+    e.preventDefault(); cancel(); openAccount(r.getAttribute("data-sid"));
+  });
+})();
+</script>
+<script>
+/* Funny answer animations. Separate script: if anything here fails, the game still works. */
+var FAC=null;
+function fAudio(){ try{ FAC=FAC||new (window.AudioContext||window.webkitAudioContext)(); if(FAC.state==="suspended") FAC.resume(); return FAC; }catch(e){ return null; } }
+function fTone(f1,f2,t0,d,type,vol){
+  var a=fAudio(); if(!a) return;
+  var o=a.createOscillator(), g=a.createGain(), t=a.currentTime+t0;
+  o.type=type||"sine"; o.frequency.setValueAtTime(f1,t); o.frequency.exponentialRampToValueAtTime(Math.max(30,f2||f1),t+d);
+  g.gain.setValueAtTime(vol||0.2,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+d+0.02);
+}
+var SND_GOOD=[
+  function(){ [523,659,784,1047].forEach(function(f,i){ fTone(f,f,i*0.11,0.16,"square",0.12); }); fTone(400,1600,0.5,0.45,"sine",0.2); },
+  function(){ fTone(200,600,0,0.18,"sine",0.25); fTone(1318,1318,0.22,0.5,"triangle",0.2); fTone(1760,1760,0.3,0.45,"triangle",0.15); },
+  function(){ for(var i=0;i<6;i++) fTone(500+i*120,500+i*120,i*0.08,0.1,"sawtooth",0.1); fTone(880,880,0.55,0.4,"square",0.12); }
+];
+var SND_BAD=[
+  function(){ [[311,0],[293,0.4],[277,0.8]].forEach(function(n){ fTone(n[0],n[0],n[1],0.36,"sawtooth",0.16); }); fTone(262,180,1.2,0.9,"sawtooth",0.16); },
+  function(){ fTone(900,120,0,0.9,"sine",0.22); fTone(150,70,0.95,0.3,"square",0.15); },
+  function(){ fTone(300,120,0,0.25,"square",0.15); fTone(300,120,0.3,0.25,"square",0.15); fTone(200,60,0.65,0.5,"sawtooth",0.15); }
+];
+var CAP_GOOD=["Cha-ching!","Look at that cash!","Genius alert!","Big brain energy!","Money mover!","Boom! Rich!"];
+var CAP_BAD=["Oopsie!","Brain buffering…","Plot twist!","Better luck next card!","So close! (maybe)","Whoops!"];
+var SK="#ffd2a1";
+function boySvg(bad){
+  return '<svg viewBox="0 0 200 260"><g class="'+(bad?'f-slip':'f-bounce')+'" style="transform-origin:100px 250px">'
+  +(bad?'<path d="M62 247 q38 -24 76 0 q-38 12 -76 0z" fill="#ffe14d" stroke="#d4a900" stroke-width="3"/>':'')
+  +'<g class="f-ll" style="transform-origin:90px 185px"><rect x="82" y="185" width="14" height="50" rx="7" fill="#33415c"/><ellipse cx="86" cy="239" rx="17" ry="8" fill="#fff"/></g>'
+  +'<g class="f-lr" style="transform-origin:112px 185px"><rect x="104" y="185" width="14" height="50" rx="7" fill="#33415c"/><ellipse cx="116" cy="239" rx="17" ry="8" fill="#fff"/></g>'
+  +'<g class="f-al" style="transform-origin:76px 128px"><line x1="76" y1="128" x2="54" y2="176" stroke="'+SK+'" stroke-width="14" stroke-linecap="round"/></g>'
+  +'<g class="f-ar" style="transform-origin:124px 128px"><line x1="124" y1="128" x2="146" y2="176" stroke="'+SK+'" stroke-width="14" stroke-linecap="round"/></g>'
+  +'<rect x="72" y="118" width="56" height="72" rx="18" fill="#ff6b6b"/><text x="100" y="164" text-anchor="middle" font-size="30" font-weight="900" fill="#fff">$</text>'
+  +'<circle cx="100" cy="80" r="38" fill="'+SK+'"/><path d="M64 66 L70 36 L84 56 L96 30 L108 56 L124 34 L134 66 Z" fill="#3b2a20"/>'
+  +'<circle cx="86" cy="80" r="5" fill="#222"/><circle cx="114" cy="80" r="5" fill="#222"/><circle cx="76" cy="94" r="7" fill="#ff9aa8" opacity=".7"/><circle cx="124" cy="94" r="7" fill="#ff9aa8" opacity=".7"/>'
+  +(bad?'<path d="M84 106 Q100 90 116 106" stroke="#7a1f1f" fill="none" stroke-width="4" stroke-linecap="round"/><circle class="f-tear" cx="84" cy="90" r="5" fill="#4fc3f7"/><circle class="f-tear" cx="116" cy="90" r="5" fill="#4fc3f7"/>'
+       :'<path d="M80 92 Q100 120 120 92 Z" fill="#7a1f1f"/><path d="M90 102 Q100 112 110 102 Z" fill="#ff8a95"/>')
+  +'</g></svg>';
+}
+function chickenSvg(){
+  return '<svg viewBox="0 0 200 260"><g class="f-bounce" style="transform-origin:100px 250px">'
+  +'<g class="f-ll" style="transform-origin:86px 215px"><line x1="86" y1="215" x2="86" y2="246" stroke="#ff9800" stroke-width="6" stroke-linecap="round"/><path d="M70 249 h30" stroke="#ff9800" stroke-width="6" stroke-linecap="round"/></g>'
+  +'<g class="f-lr" style="transform-origin:114px 215px"><line x1="114" y1="215" x2="114" y2="246" stroke="#ff9800" stroke-width="6" stroke-linecap="round"/><path d="M98 249 h30" stroke="#ff9800" stroke-width="6" stroke-linecap="round"/></g>'
+  +'<ellipse cx="100" cy="165" rx="50" ry="58" fill="#fff" stroke="#ddd" stroke-width="3"/>'
+  +'<g class="f-al" style="transform-origin:58px 150px"><ellipse cx="44" cy="172" rx="14" ry="34" fill="#f1f1f1" stroke="#ddd" stroke-width="3" transform="rotate(20 44 172)"/></g>'
+  +'<g class="f-ar" style="transform-origin:142px 150px"><ellipse cx="156" cy="172" rx="14" ry="34" fill="#f1f1f1" stroke="#ddd" stroke-width="3" transform="rotate(-20 156 172)"/></g>'
+  +'<circle cx="100" cy="85" r="34" fill="#fff" stroke="#ddd" stroke-width="3"/><path d="M82 56 q6 -24 18 -6 q8 -22 18 6 z" fill="#e53935"/>'
+  +'<path d="M90 92 L110 92 L100 110 Z" fill="#ff9800"/><circle cx="100" cy="114" r="5" fill="#e53935"/>'
+  +'<rect x="72" y="72" width="26" height="16" rx="6" fill="#111"/><rect x="102" y="72" width="26" height="16" rx="6" fill="#111"/><rect x="96" y="77" width="8" height="4" fill="#111"/>'
+  +'</g></svg>';
+}
+function catSvg(){
+  return '<svg viewBox="0 0 200 260"><g class="f-wob" style="transform-origin:100px 250px">'
+  +'<ellipse cx="100" cy="185" rx="44" ry="56" fill="#ff9d3b"/><ellipse cx="100" cy="195" rx="26" ry="38" fill="#ffe0b8"/>'
+  +'<g class="f-al" style="transform-origin:66px 150px"><line x1="66" y1="150" x2="46" y2="196" stroke="#ff9d3b" stroke-width="16" stroke-linecap="round"/></g>'
+  +'<g class="f-ar" style="transform-origin:134px 150px"><line x1="134" y1="150" x2="154" y2="196" stroke="#ff9d3b" stroke-width="16" stroke-linecap="round"/><rect x="142" y="196" width="44" height="22" rx="4" fill="#3fbf6f" stroke="#1d7a43" stroke-width="2"/><text x="164" y="213" text-anchor="middle" font-size="15" font-weight="900" fill="#fff">$</text></g>'
+  +'<ellipse cx="80" cy="238" rx="18" ry="9" fill="#ff9d3b"/><ellipse cx="120" cy="238" rx="18" ry="9" fill="#ff9d3b"/>'
+  +'<path d="M64 74 L66 36 L96 58Z M136 74 L134 36 L104 58Z" fill="#ff9d3b"/><circle cx="100" cy="94" r="42" fill="#ff9d3b"/>'
+  +'<path d="M78 90 q8 -11 16 0 M106 90 q8 -11 16 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>'
+  +'<path d="M95 102 h10 l-5 6z" fill="#ff7a8a"/><path d="M86 112 q14 14 28 0" stroke="#222" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+  +'<path d="M62 100 l-24 -6 M62 108 l-24 6 M138 100 l24 -6 M138 108 l24 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>'
+  +'<rect x="72" y="24" width="56" height="32" fill="#222"/><rect x="62" y="52" width="76" height="8" rx="4" fill="#222"/><rect x="72" y="43" width="56" height="7" fill="#e53935"/>'
+  +'<path d="M84 140 l16 8 l16 -8 l0 16 l-16 -8 l-16 8z" fill="#e53935"/>'
+  +'</g></svg>';
+}
+function robotSvg(bad){
+  return '<svg viewBox="0 0 200 260"><g class="'+(bad?'f-wob':'f-bounce')+'" style="transform-origin:100px 250px">'
+  +'<g class="f-ll" style="transform-origin:88px 190px"><rect x="78" y="190" width="18" height="48" rx="6" fill="#78909c"/><rect x="72" y="234" width="30" height="12" rx="5" fill="#455a64"/></g>'
+  +'<g class="f-lr" style="transform-origin:112px 190px"><rect x="104" y="190" width="18" height="48" rx="6" fill="#78909c"/><rect x="98" y="234" width="30" height="12" rx="5" fill="#455a64"/></g>'
+  +'<g class="f-al" style="transform-origin:70px 128px"><line x1="70" y1="128" x2="46" y2="172" stroke="#78909c" stroke-width="12" stroke-linecap="round"/><circle cx="46" cy="174" r="9" fill="#455a64"/></g>'
+  +'<g class="f-ar" style="transform-origin:130px 128px"><line x1="130" y1="128" x2="154" y2="172" stroke="#78909c" stroke-width="12" stroke-linecap="round"/><circle cx="154" cy="174" r="9" fill="#455a64"/></g>'
+  +'<rect x="70" y="108" width="60" height="80" rx="12" fill="#b9c8d8" stroke="#5c7186" stroke-width="4"/>'
+  +'<text x="100" y="158" text-anchor="middle" font-size="'+(bad?'18':'34')+'" font-weight="900" fill="'+(bad?'#c62828':'#2e7d32')+'">'+(bad?'ERR':'$')+'</text>'
+  +'<line x1="100" y1="40" x2="100" y2="16" stroke="#5c7186" stroke-width="5"/><circle cx="100" cy="12" r="8" fill="'+(bad?'#ff5252':'#ffd54f')+'"/>'
+  +'<rect x="62" y="40" width="76" height="62" rx="14" fill="#9fb3c8" stroke="#5c7186" stroke-width="4"/>'
+  +(bad?'<path d="M72 60 l18 18 M90 60 l-18 18 M110 60 l18 18 M128 60 l-18 18" stroke="#222" stroke-width="5" stroke-linecap="round"/><path d="M78 92 q8 -8 16 0 t16 0 t16 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>'
+         +'<circle class="f-smoke" cx="84" cy="34" r="10" fill="#cfd8dc"/><circle class="f-smoke" cx="104" cy="30" r="12" fill="#b0bec5" style="animation-delay:.4s"/><circle class="f-smoke" cx="124" cy="34" r="9" fill="#cfd8dc" style="animation-delay:.8s"/>'
+       :'<circle cx="82" cy="68" r="9" fill="#00e5ff"/><circle cx="118" cy="68" r="9" fill="#00e5ff"/><rect x="76" y="84" width="48" height="10" rx="5" fill="#fff"/><path d="M88 84 v10 M100 84 v10 M112 84 v10" stroke="#9fb3c8" stroke-width="2"/>')
+  +'</g></svg>';
+}
+var funTimer=null, funLast={g:-1,b:-1};
+function funPick(n,k){ var i=0; do{ i=Math.floor(Math.random()*n); }while(n>1 && i===funLast[k]); funLast[k]=i; return i; }
+function playFun(correct,value,name){
+  var st=document.getElementById("funStage"); if(!st) return false;
+  var chars=correct?[function(){return boySvg(false);},chickenSvg,catSvg,function(){return robotSvg(false);}]:[function(){return boySvg(true);},function(){return robotSvg(true);}];
+  var caps=correct?CAP_GOOD:CAP_BAD;
+  var ci=funPick(chars.length,correct?"g":"b");
+  var cap=caps[Math.floor(Math.random()*caps.length)];
+  var who=escapeHtml(name||"");
+  var notes="";
+  if(correct) for(var i=0;i<24;i++){
+    notes+='<div class="fun-note" style="left:'+(Math.random()*92)+'%;animation-duration:'+(2.2+Math.random()*2)+'s;animation-delay:'+(Math.random()*1.8)+'s;--r:'+Math.round(Math.random()*720-360)+'deg;--dx:'+Math.round(Math.random()*120-60)+'px">$</div>';
+  }
+  st.innerHTML=notes+'<div class="fun-cap">'+cap+'<span class="fun-sub'+(correct?'':' bad')+'">'+(correct?('+$'+Number(value)+' for '+who):('No deposit for '+who+' this time'))+'</span></div><div class="fun-char">'+chars[ci]()+'</div>';
+  st.classList.add("show");
+  (correct?SND_GOOD:SND_BAD)[Math.floor(Math.random()*3)]();
+  clearTimeout(funTimer); funTimer=setTimeout(stopFun,correct?4800:3800);
+  return true;
+}
+function stopFun(){
+  clearTimeout(funTimer);
+  var st=document.getElementById("funStage");
+  if(st){ st.classList.remove("show"); st.innerHTML=""; }
+}
+</script>
+</body>
+</html>
