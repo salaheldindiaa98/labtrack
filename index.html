@@ -174,7 +174,7 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const APP_VERSION='28.0';
+const APP_VERSION='29.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
@@ -212,7 +212,7 @@ async function flushStudentWrites(){
    const f={};for(const [k,v] of Object.entries(job.fields))f[k]=v===DEL?FV():v;
    batch.update(St(job.id),f);
   }await batch.commit()}
-  WQ.flight=null;WQ.retries=0;
+  WQ.flight=null;WQ.retries=0;invalidateRosterCache();
   if(WQ.pending.size)WQ.timer=setTimeout(flushStudentWrites,80);else noteSave('saved');
  }catch(e){
   WQ.flight=null;
@@ -234,15 +234,78 @@ function renderSoon(){if(FO){focusDirty=true;return}if(renderTimer)return;render
 function renderSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(()=>{searchTimer=0;render()},130)}
 function pageLimit(kind,key){const keyName=kind+'PageKey',limitName=kind+'PageLimit';if(S[keyName]!==key){S[keyName]=key;S[limitName]=PAGE}return S[limitName]||PAGE}
 function moreStudents(kind,total,n){if(n>=total)return'';return `<div class="card" style="text-align:center;margin-top:8px"><span class=m>Showing ${n} of ${total} students</span><div class=row style="justify-content:center"><button class=g onclick="S.${kind}PageLimit+=${PAGE};render()">Show ${Math.min(PAGE,total-n)} more</button><button class=g onclick="S.${kind}PageLimit=1e9;render()">Show all</button></div></div>`}
-function onStudentSnapshot(q){
- const changed=q.docChanges();
- if(loadedStudents&&changed.length===0)return;
- if(loadedStudents&&changed.length>0&&changed.length<=30&&changed.every(c=>c.type==='modified')){
-  const byId=new Map(S.studs.map(x=>[x._,x]));const valid=changed.every(c=>byId.has(c.doc.id));
-  if(valid){for(const c of changed){const s=byId.get(c.doc.id),data=c.doc.data();for(const k of Object.keys(s))if(k!=='_'&&!(k in data))delete s[k];Object.assign(s,data);gradeCalcCache.delete(s._)}mergeWQOverlay();renderSoon();return}
- }
- S.studs=q.docs.map(d=>({_:d.id,...d.data()}));loadedStudents=true;gradeCalcCache.clear();mergeWQOverlay();renderSoon();
+/* v29: scoped Firestore listeners; the ordinary attendance screen never downloads every student. */
+let studentUnsub=null,visitorUnsub=null,studentScope='',visitorScope='',primaryDocs=[],visitorDocs=[],primaryFromServer=false,
+    rosterCache=null,rosterCacheAt=0,rosterPromise=null,scopeError='',visitorError='',cacheWarning='';
+const GLOBAL_TTL=3*60*1000;
+function syncStudentView(){
+ const byId=new Map(primaryDocs.map(s=>[s._,s]));
+ for(const s of visitorDocs)if(!byId.has(s._))byId.set(s._,s);
+ S.studs=[...byId.values()];mergeWQOverlay();renderSoon();
 }
+function onStudentSnapshot(q){
+ if(!loadedStudents)gradeCalcCache.clear();else for(const ch of q.docChanges())gradeCalcCache.delete(ch.doc.id);
+ primaryDocs=q.docs.map(d=>({_:d.id,...d.data()}));primaryFromServer=q.metadata?.fromCache!==true;loadedStudents=true;scopeError='';syncStudentView();
+}
+function resetStudentListeners(){
+ if(studentUnsub){studentUnsub();studentUnsub=null}
+ if(visitorUnsub){visitorUnsub();visitorUnsub=null}
+ studentScope='';visitorScope='';primaryDocs=[];visitorDocs=[];primaryFromServer=false;loadedStudents=false;S.studs=[];
+ rosterCache=null;rosterPromise=null;gradeCalcCache.clear();
+}
+function watchStudentsForView(){
+ if(!started||!S.user||!S.cfg||!weekSessionLoaded||!loadedLabs||!S.labs.length)return;
+ const all=(S.tab==='gr'&&!S.gl),target=S.tab==='gr'?(S.gl||''):S.lab;
+ if(!all&&!target)return;
+ const key=all?'all':`lab:${target}`;
+ if(studentScope!==key){
+  if(studentUnsub){studentUnsub();studentUnsub=null}
+  studentScope=key;primaryDocs=[];primaryFromServer=false;loadedStudents=false;scopeError='';syncStudentView();
+  const q=all?db.collection('students'):db.collection('students').where('lab','==',target);
+  studentUnsub=q.onSnapshot(onStudentSnapshot,e=>{
+   scopeError='Student roster could not load: '+e.message;
+   console.error(e);renderSoon();
+  });
+ }
+ // Live visitors are a separate small equality query, not a full-roster listener.
+ const visitKey=S.tab==='att'&&S.lab&&currentSharedWeek()?`${S.lab}|${S.aw}`:'';
+ if(visitKey!==visitorScope){
+  if(visitorUnsub){visitorUnsub();visitorUnsub=null}
+  visitorScope=visitKey;visitorDocs=[];visitorError='';syncStudentView();
+  if(visitKey){
+   const lab=S.lab,w=S.aw;
+   visitorUnsub=db.collection('students').where(new firebase.firestore.FieldPath('alt',String(w)),'==',lab).onSnapshot(q=>{
+    for(const ch of q.docChanges())gradeCalcCache.delete(ch.doc.id);visitorDocs=q.docs.map(d=>({_:d.id,...d.data()}));visitorError='';syncStudentView();
+   },e=>{visitorError='Visiting-student list could not load: '+e.message;console.error(e);renderSoon()});
+  }
+ }
+}
+// A global roster fetch is deliberately on demand. A short in-memory cache allows
+// repeated searches/visitor pickers without another full collection read.
+async function allStudentsOnce({fresh=false}={}){
+ if(studentScope==='all'&&loadedStudents&&!scopeError&&(!fresh||primaryFromServer))return [...primaryDocs];
+ if(!fresh&&rosterCache&&Date.now()-rosterCacheAt<GLOBAL_TTL)return rosterCache;
+ if(!fresh&&rosterPromise)return rosterPromise;
+ const task=db.collection('students').get({source:'server'}).then(q=>{
+  const rows=q.docs.map(d=>({_:d.id,...d.data()}));
+  if(!fresh){rosterCache=rows;rosterCacheAt=Date.now()}
+  return rows;
+ });
+ if(fresh)return task;
+ rosterPromise=task;
+ try{return await task}finally{if(rosterPromise===task)rosterPromise=null}
+}
+function invalidateRosterCache(){rosterCache=null;rosterCacheAt=0}
+async function loadGlobalSearch(){
+ if(!S.aq.trim()||S.tab!=='att'||!S.user)return;
+ try{await allStudentsOnce();if(S.tab==='att'&&S.aq)renderSoon()}catch(e){scopeError='Search across other labs failed: '+e.message;renderSoon()}
+}
+function searchAttendanceInput(text){S.aq=text;renderSearch();if(String(text).trim())loadGlobalSearch()}
+function openTab(tab){
+ if(tab==='gr'&&!S.gradeLabInitialized){S.gl=S.lab;S.gradeLabInitialized=true}
+ S.tab=tab;watchStudentsForView();render();
+}
+function selectGradeLab(lab){S.gl=lab;S.gq='';detailScrollX=0;watchStudentsForView();render()}
 function gradeConfigCheck(){const key=JSON.stringify([S.cfg?.items,S.cfg?.weeks]);if(key!==gradeCfgFingerprint){gradeCfgFingerprint=key;gradeCalcCache.clear()}}
 function gradeMetricValue(s,metric){if(metric==='__total'){
  const inputs=(S.cfg.items||[]).filter(i=>i.t==='in'),scores=s.g||{};
@@ -302,9 +365,9 @@ function saveWeekSession(){
 }
 function selectAttendanceWeek(w){
  if(!currentSharedWeek())return alert('Ask an administrator to set the shared attendance week first.');
- const max=Math.max(1,+S.cfg?.weeks||12);S.aw=Math.max(1,Math.min(max,Math.trunc(+w||1)));weekManual=true;saveWeekSession();render()
+ const max=Math.max(1,+S.cfg?.weeks||12);S.aw=Math.max(1,Math.min(max,Math.trunc(+w||1)));weekManual=true;saveWeekSession();watchStudentsForView();render()
 }
-function selectAttendanceLab(lab){S.lab=lab;S.aq='';detailScrollX=0;if(currentSharedWeek())saveWeekSession();render()}
+function selectAttendanceLab(lab){S.lab=lab;S.aq='';scopeError='';detailScrollX=0;if(currentSharedWeek())saveWeekSession();watchStudentsForView();render()}
 // Every signed-in client can perform the Friday update, but a transaction ensures
 // that simultaneous devices cannot increment the shared week more than once.
 async function checkFridayAdvance(){
@@ -340,13 +403,13 @@ function watchWeekSession(){
  if(!S.user?.uid)return;
  weekSessionLoaded=false;weekSessionError='';weekSession=null;weekCycle='';weekManual=false;
  weekSessionUnsub=db.collection('weekSessions').doc(S.user.uid).onSnapshot(d=>{
-  weekSession=d.exists?d.data():null;weekSessionLoaded=true;weekSessionError='';applyWeekPreferences();render();
+  weekSession=d.exists?d.data():null;weekSessionLoaded=true;weekSessionError='';applyWeekPreferences();watchStudentsForView();render();
  },e=>{
   weekSessionError='Could not access your Firebase week preferences. Update Firestore security rules for /weekSessions/{uid}: '+e.message;
   weekSessionLoaded=false;console.error(e);render();
  });
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){applyWeekPreferences();render();checkFridayAdvance()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){applyWeekPreferences();watchStudentsForView();render();checkFridayAdvance()}});
 window.addEventListener('focus',()=>{applyWeekPreferences();checkFridayAdvance()});
 
 /* ---------- start-up, setup, account access ---------- */
@@ -407,11 +470,13 @@ service cloud.firestore {
 }`;
 const defaultCfg=uid=>({weeks:12,locked:{},items:DEF,admins:[uid],altLabLimit:2,absenceWarn:3});
 const ts=()=>firebase.firestore.FieldValue.serverTimestamp();
-function stopLive(){clearTimeout(WQ.timer);clearTimeout(WQ.retryTimer);WQ.pending.clear();WQ.flight=null;WQ.state='idle';unsubs.splice(0).forEach(u=>{try{u()}catch(_){}});if(insUnsub){try{insUnsub()}catch(_){ }insUnsub=null}started=0;weekSessionError='';weekAdvanceError='';if(weekSessionUnsub){try{weekSessionUnsub()}catch(_){}weekSessionUnsub=null}weekSessionLoaded=false;weekSession=null;weekCycle='';weekManual=false;loadedLabs=false;loadedStudents=false;gradeCalcCache.clear();S.cfg=null;S.labs=[];S.studs=[];S.instructors=[]}
+function stopLive(){resetStudentListeners();clearTimeout(WQ.timer);clearTimeout(WQ.retryTimer);WQ.pending.clear();WQ.flight=null;WQ.state='idle';unsubs.splice(0).forEach(u=>{try{u()}catch(_){}});if(insUnsub){try{insUnsub()}catch(_){ }insUnsub=null}started=0;weekSessionError='';weekAdvanceError='';if(weekSessionUnsub){try{weekSessionUnsub()}catch(_){}weekSessionUnsub=null}weekSessionLoaded=false;weekSession=null;weekCycle='';weekManual=false;loadedLabs=false;loadedStudents=false;gradeCalcCache.clear();S.cfg=null;S.labs=[];S.studs=[];S.instructors=[]}
 function stopProfileWatch(){if(profileUnsub){try{profileUnsub()}catch(_){ }profileUnsub=null}}
-function boot(){const c=localStorage.fbc||JSON.stringify(CFG);
- try{firebase.initializeApp(JSON.parse(c));auth=firebase.auth();db=firebase.firestore()}catch(e){return setup('Config problem: '+e.message)}
- auth.onAuthStateChanged(async u=>{S.user=u||null;if(signupBusy)return;if(!u){stopLive();stopProfileWatch();S.profile=null;return login()}await gateUser(u)})}
+async function boot(){const c=localStorage.fbc||JSON.stringify(CFG);
+  try{firebase.initializeApp(JSON.parse(c));auth=firebase.auth();db=firebase.firestore()}catch(e){return setup('Config problem: '+e.message)}
+  if(localStorage.getItem('labtrack-clear-cache')==='1'){try{await db.clearPersistence()}catch(e){console.warn('Could not clear stored offline cache',e)}localStorage.removeItem('labtrack-clear-cache')}
+  if(localStorage.getItem('labtrack-device-cache')==='1'){try{await db.enablePersistence({synchronizeTabs:true})}catch(e){cacheWarning='Offline cache unavailable on this device: '+e.message;console.warn(cacheWarning)}}
+  auth.onAuthStateChanged(async u=>{S.user=u||null;if(signupBusy)return;if(!u){stopLive();stopProfileWatch();S.profile=null;return login()}await gateUser(u)})}
 function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack setup</h2>
 <p class=m>1. In Firebase create a Web app and copy its firebaseConfig.<br>2. Authentication → Sign-in method: enable <b>Email/Password</b>. You do not need to add instructors under Firebase Users.<br>3. Firestore Database → Rules: paste the secure rules below and Publish. The first LabTrack account created in a new database becomes the admin; later accounts wait for admin approval.</p>
 <pre class=rulesbox>${esc(SEC_RULES)}</pre><button class=g onclick=copyRules()>Copy security rules</button>
@@ -420,7 +485,7 @@ function setup(err=''){$('#app').innerHTML=`<main><div class=card><h2>LabTrack s
 function saveCfg(){const o={};for(const m of $('#cfgt').value.matchAll(/(\w+)\s*:\s*["']([^"']+)["']/g))o[m[1]]=m[2];
  if(!o.apiKey||!o.projectId)return setup('apiKey or projectId not found. Paste the whole config.');localStorage.fbc=JSON.stringify(o);location.reload()}
 async function copyRules(){try{await navigator.clipboard.writeText(SEC_RULES);alert('Security rules copied. Paste them in Firebase → Firestore Database → Rules and press Publish.')}catch(_){alert('Copy failed. Select the rules text and copy it manually.')}}
-function login(err='',mode='signin',note=''){$('#app').innerHTML=`<div class=authwrap><div class="card authcard"><div class=authbrand><h1>LabTrack</h1><p>Instructor access · v28</p></div>
+function login(err='',mode='signin',note=''){$('#app').innerHTML=`<div class=authwrap><div class="card authcard"><div class=authbrand><h1>LabTrack</h1><p>Instructor access · v29</p></div>
 <div class=authseg><button class="${mode==='signin'?'on':''}" onclick="login('','signin')">Sign in</button><button class="${mode==='signup'?'on':''}" onclick="login('','signup')">Create account</button></div>
 ${mode==='signup'?`<label>Full name<input id=nm autocomplete=name placeholder="Instructor name"></label><label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=new-password minlength=6></label><label>Confirm password<input id=pw2 type=password autocomplete=new-password minlength=6></label><button class=wide onclick=signUp()>Create LabTrack account</button><p class=m>Your account will remain pending until a LabTrack admin approves it.</p>`:mode==='forgot'?`<h3>Reset password</h3><label>Email<input id=em type=email autocomplete=email></label><button class=wide onclick=sendReset()>Send reset email</button><button class="authlink wide" onclick="login('','signin')">Back to sign in</button>`:`<label>Email<input id=em type=email autocomplete=email></label><label>Password<input id=pw type=password autocomplete=current-password onkeydown="if(event.key==='Enter')signIn()"></label><button class=wide onclick=signIn()>Sign in</button><button class="authlink wide" onclick="login('','forgot')">Forgot password?</button>`}
 ${note?`<p class=m>${esc(note)}</p>`:''}${err?`<p class=e>${esc(err)}</p>`:''}<div style="margin-top:14px;text-align:center"><button class=g onclick="localStorage.removeItem('fbc');location.reload()">Change Firebase setup</button></div></div></div>`}
@@ -455,9 +520,9 @@ async function gateUser(u){loadingAccount();const ref=db.collection('instructors
 function watchOwnProfile(ref){stopProfileWatch();profileUnsub=ref.onSnapshot(d=>{if(!d.exists)return;const p={id:d.id,...d.data()},wasApproved=S.profile?.approved===true;S.profile=p;if(p.approved!==true||p.status!=='approved'){if(started)stopLive();return p.status==='rejected'?rejectedScreen():pendingScreen()}if(!started)start();else if(!wasApproved)render()},()=>{})}
 function watchInstructors(){if(S.admin&&S.tab==='ins'&&!insUnsub){insUnsub=db.collection('instructors').onSnapshot(q=>{S.instructors=q.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==='ins')render()},e=>console.error(e))}else if((!S.admin||S.tab!=='ins')&&insUnsub){try{insUnsub()}catch(_){}insUnsub=null;S.instructors=[];if(S.tab==='ins')S.tab='att'}}
 function start(){if(started)return;started=1;watchWeekSession();
- unsubs.push(db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set(defaultCfg(S.user.uid));S.cfg=d.data();gradeConfigCheck();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});applyWeekPreferences();watchInstructors();render();checkFridayAdvance()},e=>{console.error(e);alert(e.message)}));
- unsubs.push(db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));loadedLabs=true;if(!S.labs.find(l=>l.id===S.lab)){S.lab=S.labs[0]?.id||''}render()}));
- unsubs.push(db.collection('students').onSnapshot(onStudentSnapshot,e=>{console.error(e);noteSave('unsaved',e.message)}))}
+ unsubs.push(db.doc('cfg/main').onSnapshot(d=>{if(!d.exists)return d.ref.set(defaultCfg(S.user.uid));S.cfg=d.data();gradeConfigCheck();S.admin=(S.cfg.admins||[]).includes(S.user.uid);const p={};if(S.cfg.altLabLimit==null)p.altLabLimit=2;if(S.cfg.absenceWarn==null)p.absenceWarn=3;if(Object.keys(p).length)d.ref.set(p,{merge:true});applyWeekPreferences();watchInstructors();watchStudentsForView();render();checkFridayAdvance()},e=>{console.error(e);alert(e.message)}));
+ unsubs.push(db.collection('labs').onSnapshot(q=>{S.labs=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));loadedLabs=true;if(!S.labs.find(l=>l.id===S.lab)){S.lab=S.labs[0]?.id||''}watchStudentsForView();render()}));
+ watchStudentsForView()}
 
 /* ---------- helpers ---------- */
 const serialCmp=(a,b)=>{const A=String(a.sn??'').trim(),B=String(b.sn??'').trim();if(!A&&!B){}else if(!A)return 1;else if(!B)return -1;else{const an=/^[+-]?\d+(?:\.\d+)?$/.test(A)?+A:null,bn=/^[+-]?\d+(?:\.\d+)?$/.test(B)?+B:null;if(an!==null&&bn!==null&&an!==bn)return an-bn;const c=A.localeCompare(B,undefined,{numeric:true,sensitivity:'base'});if(c)return c}const id=String(a.sid??'').localeCompare(String(b.sid??''),undefined,{numeric:true,sensitivity:'base'});return id||String(a.nm??'').localeCompare(String(b.nm??''),undefined,{numeric:true,sensitivity:'base'})};
@@ -471,7 +536,7 @@ const altN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='X').length;
 const shortDate=d=>{if(!d)return'';const x=new Date(d+'T00:00:00');return isNaN(x)?d:x.toLocaleDateString(undefined,{month:'short',day:'numeric'})};
 const studentMatch=(s,q)=>{q=norm(q);return !q||norm(s.sn).includes(q)||norm(s.sid).includes(q)||norm(s.nm).includes(q)};
 const attStudents=()=>LS(S.lab).filter(s=>studentMatch(s,S.aq));
-const attendanceUniversalMatches=()=>S.aq?allBySerial().filter(s=>studentMatch(s,S.aq)):[];
+const attendanceUniversalMatches=()=>S.aq?(rosterCache||S.studs).filter(s=>studentMatch(s,S.aq)).sort(serialCmp):[];
 const gradeStudents=()=>gradeFiltered();
 function calc(s){gradeConfigCheck();if(gradeCalcCache.has(s._))return gradeCalcCache.get(s._);const m={},it=S.cfg.items,g=s.g||{};
  const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
@@ -497,10 +562,10 @@ function calc(s){gradeConfigCheck();if(gradeCalcCache.has(s._))return gradeCalcC
 function render(){if(!S.cfg||!S.user||S.profile?.approved!==true)return;
  if(!weekSessionLoaded){$('#app').innerHTML=`<main><div class=card><h2>Connecting to Firebase week preferences</h2>${weekSessionError?`<p class=e>${esc(weekSessionError)}</p><p>Before using v27, publish its updated Firestore security rules. The new rule grants each approved instructor access to their own week session.</p><button onclick=auth.signOut()>Sign out</button>`:'<p class=m>Reading the current shared week and your last session.</p>'}</div></main>`;return}
  const a=document.activeElement,f=a&&a.dataset&&a.dataset.f,ss=a&&typeof a.selectionStart==='number'?a.selectionStart:null,se=a&&typeof a.selectionEnd==='number'?a.selectionEnd:null;
- const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';watchInstructors();
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v28</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
-<nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';render()">${n}</button>`).join('')}</nav>
-<main>${weekAdvanceError?`<div class=card style="border-color:#f1b6ad;color:var(--r)"><b>Firebase week synchronization error</b><p>${esc(weekAdvanceError)}</p><p class=m>Publish the v27 Firestore security rules and reopen LabTrack to retry.</p></div>`:''}${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
+ const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';watchInstructors();watchStudentsForView();
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v29</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
+<nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="openTab('${k}')">${n}</button>`).join('')}</nav>
+<main>${scopeError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(scopeError)}</div>`:''}${visitorError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(visitorError)}</div>`:''}${!loadedStudents&&(S.tab==='att'||S.tab==='gr')?'<div class=card>Loading selected student roster from Firebase…</div>':''}${weekAdvanceError?`<div class=card style="border-color:#f1b6ad;color:var(--r)"><b>Firebase week synchronization error</b><p>${esc(weekAdvanceError)}</p><p class=m>Publish the v27 Firestore security rules and reopen LabTrack to retry.</p></div>`:''}${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);if(e){e.focus();if(ss!==null&&typeof e.setSelectionRange==='function'){const L=String(e.value??'').length;e.setSelectionRange(Math.min(ss,L),Math.min(se??ss,L))}}}paintSaveState();requestAnimationFrame(()=>applySyncedScroll())}
 
 
@@ -528,7 +593,7 @@ function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(
  return `<div class="card att-h5"><div class=att-h5-head><div class=att-h5-lab><select class=att-h5-labselect onchange="selectAttendanceLab(this.value)">${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.lab?'selected':''}>${esc(x.name)}</option>`).join('')}</select><div class=att-h5-place><span>Place</span><input data-f=lp value="${esc(l.place)}" placeholder="Not set" onchange="db.doc('labs/${l.id}').update({place:this.value})"></div></div><div class=att-h5-labtools><button class=att-h5-icon title="Add lab" onclick=addLab()>＋</button><button class="att-h5-icon danger" title="Remove this lab" onclick=delLab()>×</button></div></div>
  <div class=att-h5-session><div class=att-h5-session-title><span>Attendance session · Shared default: Week ${currentSharedWeek().week}${S.aw!==currentSharedWeek().week?' · Viewing Week '+S.aw:''}</span><span class="badge ${locked?'warn':'blue'}">${locked?'Locked':'Unlocked'}</span></div><div class=att-h5-session-body><label>Session week<select onchange="selectAttendanceWeek(this.value)">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label><label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>${S.admin?`<button class="g weeklock" onclick="lock(${S.aw})">${locked?'Unlock':'Lock'} Week ${S.aw}</button>`:'<span></span>'}</div></div>
  <div class=att-h5-actions><button class="g grow" onclick=startAttendanceFocus() ${locked&&!S.admin?'disabled':''}>Focus mode${S.aq?' · filtered':''}</button><button class=grow onclick=startQrAttendance() ${locked&&!S.admin?'disabled':''}>▣ Scan QR</button><button class=grow onclick=visitorModal() ${locked&&!S.admin?'disabled':''}>+ Visiting student</button>${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div><div class=att-h5-policy><span class="badge blue">Other-lab allowance: ${lim}</span>${visitingFocusSkipped?`<span class="badge blue">Focus skips ${visitingFocusSkipped} visiting student${visitingFocusSkipped===1?'':'s'} this week</span>`:''}<span class=badge>Warning after &gt; ${thr} absences</span></div>
- <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search all labs by serial, ID or name" oninput="S.aq=this.value;renderSearch()"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';render()">Clear</button>':''}</div>
+ <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search all labs by serial, ID or name" oninput="searchAttendanceInput(this.value)"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';render()">Clear</button>':''}</div>
  <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)"><button class=g onclick="$('#f1').click()">Sync SIS roster (.xls)</button><button class=g onclick="$('#f2').click()">Upload course serials</button>${S.admin?'<button class=g onclick="generateSerials(\'missing\')">Assign missing serials</button><button class=g onclick="generateSerials(\'all\')">Rebuild serials</button>':''}<button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button><button class=g onclick=exAllStudentsExcel()>All students Excel</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
  ${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class="namecell ${flag?'flagname':''}"><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class="badge blue">Att ${ac}</span>${s.st&&s.st!==SL[0]?`<span class="badge warn">${esc(s.st)}</span>`:''}${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ Abs ${bc}</button>`:`<span class=badge>Abs ${bc}</span>`}<span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">Other ${xc}/${lim}</span><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${rng(W).map(w=>{const v=a[w]||'',title=(l.dates||{})[w]?`Week ${w} · ${shortDate((l.dates||{})[w])}`:`Week ${w}`,extra=v=='X'?` · Attended in ${labName((s.alt||{})[w])}`:'';return `<div class=attcell><button title="${esc(title+extra)}" class="attplain ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="if(syncClickGuard())return;mark('${s._}',${w},'${v}')"><span class=attweek>W${w}${S.cfg.locked?.[w]?' 🔒':''}</span><span class=attmark>${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</span></button></div>`}).join('')}</div></div></div></div>`}).join('')}</div>`:foreign.length?`<div class=externalresults><div class=externalresults-title>Student${foreign.length===1?'':'s'} found outside ${esc(l.name)}</div>${foreign.map(s=>`<div class=externalstudent><div><div class=externalstudent-name>${esc(s.nm||'Unnamed student')}</div><div class=externalstudent-meta>Serial ${esc(s.sn||'—')} · ID ${esc(s.sid||'—')}</div></div><div class=externalstudent-action><span class=badge>${esc(labName(s.lab))}</span><button onclick="goToAttendanceLab('${s.lab}')">Go to ${esc(labName(s.lab))}</button></div></div>`).join('')}</div>`:'<div class="card emptyresults">No students match your search in any lab.</div>'}${moreStudents('att',shown.length,visible.length)}`}
 
@@ -537,17 +602,17 @@ function goToAttendanceLab(id){if(!S.labs.some(l=>l.id===id))return;selectAttend
 function mark(id,w,cur){if(cur==='X'&&!confirm('This student already attended another lab this week. Remove the visiting attendance record?'))return;let n=cur==''?'P':cur=='P'?'A':'';const u={['att.'+w]:n==''?FV():n,['alt.'+w]:FV()};St(id).update(u)}
 function lock(w){if(S.admin)Cf().update({['locked.'+w]:!S.cfg.locked?.[w]})}
 function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),place:'',dates:{}}).then(r=>{S.lab=r.id})}
-function delLab(){if(!confirm('Remove this lab and all its students?'))return;const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));b.commit()}
-function nextSerialNumber(){const used=new Set(S.studs.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let i=1;while(used.has(i))i++;return i}
-function addSt(){const n=$('#a3').value.trim(),i=$('#a2').value.trim();if(!n&&!i)return;db.collection('students').add({lab:S.lab,sn:$('#a1').value.trim()||String(nextSerialNumber()),sid:i,nm:n,att:{},alt:{},g:{}})}
+async function delLab(){if(!loadedStudents)return alert('Wait for the lab roster to load.');if(!confirm('Remove this lab and all its students?'))return;try{const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));await b.commit();invalidateRosterCache()}catch(e){alert('Could not remove lab: '+e.message)}}
+function nextSerialNumber(roster=S.studs){const used=new Set(roster.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let i=1;while(used.has(i))i++;return i}
+async function addSt(){const n=$('#a3')?.value.trim(),i=$('#a2')?.value.trim();if(!n&&!i)return;try{const roster=await allStudentsOnce({fresh:true});const explicit=$('#a1')?.value.trim();if(i&&roster.some(s=>norm(s.sid)===norm(i)))return alert('This student ID already exists in another lab. Move the existing student instead of duplicating their record.');await db.collection('students').add({lab:S.lab,sn:explicit||String(nextSerialNumber(roster)),sid:i,nm:n,att:{},alt:{},g:{}});invalidateRosterCache();renderSoon()}catch(e){alert('Could not add student: '+e.message)}}
 function delSt(id){if(confirm('Remove this student?'))St(id).delete()}
 let VISITOR={pool:[],query:'',selected:null};
-function visitorModal(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');VISITOR.pool=S.studs.filter(s=>s.lab!==S.lab).sort(serialCmp);VISITOR.query='';VISITOR.selected=null;if(!VISITOR.pool.length)return alert('There are no students in other labs.');$('#modal').innerHTML=`<div class=visitorov role=dialog aria-modal=true aria-label="Add visiting student"><div class=visitorpanel><div class=visitorhead><div class=grow><h3>Add visiting student</h3><div class=m>Week ${w}${(l.dates||{})[w]?' · '+esc(shortDate((l.dates||{})[w])):''} · attending ${esc(l.name)}</div></div><button type=button class=g onclick=closeVisitor()>Close</button></div><input id=visitorSearch class=visitorsearch type=search inputmode=search autocomplete=off autocorrect=off autocapitalize=off spellcheck=false placeholder="Search serial, ID, name or home lab"><div class=visitorhint>Students from all other labs are listed below. Tap a student to continue.</div><div id=visitorResults class=visitorresults></div></div></div>`;const inp=$('#visitorSearch'),handler=()=>renderVisitorResults(inp?.value||'');if(inp){inp.addEventListener('input',handler,{passive:true});inp.addEventListener('keyup',handler,{passive:true});inp.addEventListener('search',handler,{passive:true})}renderVisitorResults('');setTimeout(()=>{try{inp?.focus({preventScroll:true})}catch(_){try{inp?.focus()}catch(__){}}},80)}
+async function visitorModal(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');VISITOR.query='';VISITOR.selected=null;try{const rows=await allStudentsOnce();if(S.lab!==l.id||S.aw!==w)return;VISITOR.pool=rows.filter(s=>s.lab!==S.lab).sort(serialCmp);if(!VISITOR.pool.length)return alert('There are no students in other labs.');}catch(e){return alert('Could not search students from other labs: '+e.message)}$('#modal').innerHTML=`<div class=visitorov role=dialog aria-modal=true aria-label="Add visiting student"><div class=visitorpanel><div class=visitorhead><div class=grow><h3>Add visiting student</h3><div class=m>Week ${w}${(l.dates||{})[w]?' · '+esc(shortDate((l.dates||{})[w])):''} · attending ${esc(l.name)}</div></div><button type=button class=g onclick=closeVisitor()>Close</button></div><input id=visitorSearch class=visitorsearch type=search inputmode=search autocomplete=off autocorrect=off autocapitalize=off spellcheck=false placeholder="Search serial, ID, name or home lab"><div class=visitorhint>Students from all other labs are listed below. Tap a student to continue.</div><div id=visitorResults class=visitorresults></div></div></div>`;const inp=$('#visitorSearch'),handler=()=>renderVisitorResults(inp?.value||'');if(inp){inp.addEventListener('input',handler,{passive:true});inp.addEventListener('keyup',handler,{passive:true});inp.addEventListener('search',handler,{passive:true})}renderVisitorResults('');setTimeout(()=>{try{inp?.focus({preventScroll:true})}catch(_){try{inp?.focus()}catch(__){}}},80)}
 function closeVisitor(){$('#modal').innerHTML=''}
 function renderVisitorResults(q){VISITOR.query=String(q??'');const nq=norm(q),box=$('#visitorResults');if(!box)return;const list=VISITOR.pool.filter(s=>{if(!nq)return true;const hay=norm(`${s.sn||''} ${s.sid||''} ${s.nm||''} ${labName(s.lab)}`);return hay.includes(nq)}).slice(0,200);box.innerHTML=list.length?list.map(s=>`<button type=button class="visitorrow ${VISITOR.selected===s._?'visitorselected':''}" onclick="selectVisitor('${s._}')"><span class=visitorserial>${esc(s.sn||'—')}</span><span class=visitormain><b>${esc(s.nm||'Unnamed student')}</b><small>${esc(s.sid||'No ID')}</small></span><span class=visitorlab>${esc(labName(s.lab))}</span></button>`).join(''):`<div class=visitorempty>No student matches this search.</div>`}
 function filterVisitor(q){renderVisitorResults(q)}
-function selectVisitor(id){VISITOR.selected=id;const s=S.studs.find(x=>x._===id),box=$('#visitorResults');if(!s||!box)return;const used=altN(s),lim=Math.max(0,+S.cfg.altLabLimit||0),w=S.aw,cur=(s.att||{})[w]||'',where=cur==='X'?labName((s.alt||{})[w]):cur==='P'?'Present in home lab':cur==='A'?'Absent in home lab':'Not marked';box.innerHTML=`<div class=visitorchoice><h3>${esc(s.nm||'Unnamed student')}</h3><div class=m>${esc(s.sid||'No ID')} · Serial ${esc(s.sn||'—')} · Home: ${esc(labName(s.lab))}</div><div class=row><span class="badge ${used>=lim&&lim>0?'warn':'blue'}">Other-lab attendance ${used}/${lim}</span><span class=badge>${esc(where)}</span></div><div class=row><button type=button onclick="saveVisitor('${s._}')">Mark attended here</button><button type=button class=g onclick="renderVisitorResults(VISITOR.query)">Back to results</button></div></div>`}
-async function saveVisitor(id){id=id||VISITOR.selected;const s=S.studs.find(x=>x._===id),w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0);if(!s)return alert('Choose a student.');const cur=(s.att||{})[w]||'',used=altN(s),oldAlt=(s.alt||{})[w];if(cur!=='X'&&used>=lim)return alert(`${s.nm} has already used ${used}/${lim} other-lab attendances.`);if(lim<1&&cur!=='X')return alert('Other-lab attendance allowance is currently 0.');if(cur==='P'&&!confirm('This student is already marked present in the home lab for this week. Replace it with attendance in this lab?'))return;if(cur==='X'&&oldAlt&&oldAlt!==S.lab&&!confirm(`This student is already recorded as attending ${labName(oldAlt)} this week. Move the visiting attendance to ${labName(S.lab)}?`))return;try{await St(id).update({['att.'+w]:'X',['alt.'+w]:S.lab});closeVisitor()}catch(e){alert('Could not save visiting attendance: '+(e?.message||e))}}
+function selectVisitor(id){VISITOR.selected=id;const s=VISITOR.pool.find(x=>x._===id),box=$('#visitorResults');if(!s||!box)return;const used=altN(s),lim=Math.max(0,+S.cfg.altLabLimit||0),w=S.aw,cur=(s.att||{})[w]||'',where=cur==='X'?labName((s.alt||{})[w]):cur==='P'?'Present in home lab':cur==='A'?'Absent in home lab':'Not marked';box.innerHTML=`<div class=visitorchoice><h3>${esc(s.nm||'Unnamed student')}</h3><div class=m>${esc(s.sid||'No ID')} · Serial ${esc(s.sn||'—')} · Home: ${esc(labName(s.lab))}</div><div class=row><span class="badge ${used>=lim&&lim>0?'warn':'blue'}">Other-lab attendance ${used}/${lim}</span><span class=badge>${esc(where)}</span></div><div class=row><button type=button onclick="saveVisitor('${s._}')">Mark attended here</button><button type=button class=g onclick="renderVisitorResults(VISITOR.query)">Back to results</button></div></div>`}
+async function saveVisitor(id){id=id||VISITOR.selected;let s=VISITOR.pool.find(x=>x._===id);if(!s)return alert('Choose a student.');try{const latest=await St(id).get({source:'server'});if(!latest.exists)return alert('This student was removed.');s={_:id,...latest.data()};}catch(e){return alert('Could not verify visiting attendance: '+e.message)}const w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0);const cur=(s.att||{})[w]||'',used=altN(s),oldAlt=(s.alt||{})[w];if(cur!=='X'&&used>=lim)return alert(`${s.nm} has already used ${used}/${lim} other-lab attendances.`);if(lim<1&&cur!=='X')return alert('Other-lab attendance allowance is currently 0.');if(cur==='P'&&!confirm('This student is already marked present in the home lab for this week. Replace it with attendance in this lab?'))return;if(cur==='X'&&oldAlt&&oldAlt!==S.lab&&!confirm(`This student is already recorded as attending ${labName(oldAlt)} this week. Move the visiting attendance to ${labName(S.lab)}?`))return;try{await St(id).update({['att.'+w]:'X',['alt.'+w]:S.lab});invalidateRosterCache();closeVisitor()}catch(e){alert('Could not save visiting attendance: '+(e?.message||e))}}
 function clearVisitor(id,w){if(S.cfg.locked?.[w]&&!S.admin)return;St(id).update({['att.'+w]:FV(),['alt.'+w]:FV()})}
 async function warnStudent(id){const s=S.studs.find(x=>x._===id);if(!s)return;const n=absN(s),t=Math.max(0,+S.cfg.absenceWarn||0),msg=`Attendance warning: ${s.nm}${s.sid?' ('+s.sid+')':''} has ${n} recorded absences, exceeding the course threshold of ${t}. Please review your attendance record.`;try{if(navigator.share){await navigator.share({title:'Attendance warning',text:msg});return}if(navigator.clipboard){await navigator.clipboard.writeText(msg);alert('Warning copied. You can paste it into WhatsApp, email, or another message.');return}}catch(e){if(e?.name==='AbortError')return}prompt('Copy this warning:',msg)}
 
@@ -565,7 +630,7 @@ async function saveStudentDetails(id){
  if(lab!==s.lab&&!confirm(`Move ${s.nm||s.sid} from ${labName(s.lab)} to ${labName(lab)}?\n\nAll attendance, grades, visiting history, and notes will remain unchanged.`))return;
  const button=$('#studentmodal button[onclick^="saveStudentDetails"]');if(button)button.disabled=true;
  try{
-  await St(id).update({lab,st,note:note||FV()});
+  await St(id).update({lab,st,note:note||FV()});invalidateRosterCache();
   s.lab=lab;s.note=note;s.st=st;
   closeStudentDetails();render();if(FO)renderFocus();
  }catch(e){alert('Could not save student details: '+e.message);if(button)button.disabled=false}
@@ -587,13 +652,13 @@ async function restartQrCamera(){await stopQrCameraOnly();setTimeout(()=>startQr
 async function stopQrCameraOnly(){const q=QRSCAN.scanner;QRSCAN.scanner=null;QRSCAN.started=false;if(q){try{await q.stop()}catch(_){}try{q.clear()}catch(_){}}document.querySelectorAll('#qr-reader video').forEach(v=>{try{v.srcObject?.getTracks?.().forEach(t=>t.stop())}catch(_){}})}
 async function stopQrAttendance(keepModal=false){await stopQrCameraOnly();QRSCAN.busy=false;if(!keepModal)$('#modal').innerHTML=''}
 async function qrDecoded(decoded){const code=String(decoded??'').trim(),now=Date.now();if(!code||QRSCAN.busy)return;if(code===QRSCAN.last&&now-QRSCAN.lastAt<2200)return;QRSCAN.last=code;QRSCAN.lastAt=now;QRSCAN.busy=true;try{await qrMarkStudent(code)}finally{setTimeout(()=>QRSCAN.busy=false,350)}}
-async function qrMarkStudent(studentId){const matches=S.studs.filter(s=>String(s.sid??'').trim()===studentId);if(!matches.length){qrBeep(false);qrShow('err','Student ID not found',null,studentId);return}if(matches.length>1){qrBeep(false);qrShow('err','Duplicate Student ID in LabTrack',null,`${studentId} matches ${matches.length} records. Fix the roster before scanning.`);return}const s=matches[0],w=S.aw,l=S.labs.find(x=>x.id===S.lab);if(!l){qrBeep(false);qrShow('err','No attendance lab selected',s);return}if(S.cfg.locked?.[w]&&!S.admin){qrBeep(false);qrShow('err',`Week ${w} is locked`,s);return}const cur=(s.att||{})[w]||'';
+async function qrMarkStudent(studentId){let matches;try{const q=await db.collection('students').where('sid','==',studentId).limit(2).get({source:'server'});matches=q.docs.map(d=>({_:d.id,...d.data()}))}catch(e){qrBeep(false);qrShow('err','QR student lookup failed',null,e.message);return}if(!matches.length){qrBeep(false);qrShow('err','Student ID not found',null,studentId);return}if(matches.length>1){qrBeep(false);qrShow('err','Duplicate Student ID in LabTrack',null,`${studentId} matches ${matches.length} records. Fix the roster before scanning.`);return}const s=matches[0],w=S.aw,l=S.labs.find(x=>x.id===S.lab);if(!l){qrBeep(false);qrShow('err','No attendance lab selected',s);return}if(S.cfg.locked?.[w]&&!S.admin){qrBeep(false);qrShow('err',`Week ${w} is locked`,s);return}const cur=(s.att||{})[w]||'';
  if(s.lab===S.lab){if(cur==='X'){qrBeep(false);qrShow('warn','Already attended as a visiting student',s,'Week '+w+' · '+labName((s.alt||{})[w]));return}if(cur==='P'){qrShow('warn','Already marked present',s,`${labName(s.lab)} · Week ${w}`);return}await St(s._).update({['att.'+w]:'P',['alt.'+w]:FV()});QRSCAN.count++;qrBeep(true);qrShow('ok','Present',s,`${labName(s.lab)} · Week ${w}`);return}
  const lim=Math.max(0,+S.cfg.altLabLimit||0),used=altN(s),alreadyHere=cur==='X'&&(s.alt||{})[w]===S.lab;if(alreadyHere){qrShow('warn','Already marked here as a visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${used}/${lim}`);return}if(lim<1){qrBeep(false);qrShow('err','Other-lab attendance is disabled',s,`Home lab: ${labName(s.lab)}`);return}if(cur!=='X'&&used>=lim){qrBeep(false);qrShow('err','Other-lab allowance reached',s,`${used}/${lim} already used · Home lab: ${labName(s.lab)}`);return}await St(s._).update({['att.'+w]:'X',['alt.'+w]:S.lab});QRSCAN.count++;qrBeep(true);qrShow('ok','Present here as visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${cur==='X'?used:used+1}/${lim}`)}
 
 /* QR stickers: QR content is exactly the Student ID; identity labels are outside the sticker and are hidden when printing. */
 function openQrStickers(){if(typeof QRCode==='undefined')return alert('The QR generator library did not load. Check your internet connection and reload LabTrack.');const scope=S.lab||'',list=(scope?LS(scope):allBySerial()).filter(s=>String(s.sid??'').trim());$('#modal').innerHTML=`<div class=qrprintov><div class=qrprintpanel><div class=qrprinthead><h2>Student QR stickers</h2><div class=qrprintscope><span class=m>Scope</span><select id=qrprintscope onchange="renderQrStickers(this.value)"><option value="">All labs</option>${S.labs.map(l=>`<option value="${l.id}" ${l.id===scope?'selected':''}>${esc(l.name)}</option>`).join('')}</select><button onclick=printQrStickers()>Print</button><button class=g onclick=closeQrStickers()>Close</button></div></div><p class=qrprintnote>Each printed sticker is QR-only. The printed QR itself is 18 mm square inside a 25 mm white square, giving it a clear quiet zone for faster scanning. The on-screen name/ID is only for matching stickers to students and is hidden when printing. QR content = exact Student ID.</p><div id=qrprintgrid class=qrprintgrid></div></div></div>`;renderQrStickers(scope)}
-function renderQrStickers(scope){const list=(scope?LS(scope):allBySerial()).filter(s=>String(s.sid??'').trim()),grid=$('#qrprintgrid');if(!grid)return;grid.innerHTML=list.length?list.map((s,i)=>`<div class=qrprintitem><div class=qrsticker><div id="qrcode_${i}"></div></div><div class=qrprintwho><b>Serial ${esc(s.sn||'—')} · ${esc(s.sid)}</b><span>${esc(s.nm||'Unnamed student')}</span><span>${esc(labName(s.lab))}</span></div></div>`).join(''):'<div class="card emptyresults">No students with IDs were found in this scope.</div>';requestAnimationFrame(()=>{list.forEach((s,i)=>{const e=document.getElementById('qrcode_'+i);if(!e)return;new QRCode(e,{text:String(s.sid).trim(),width:256,height:256,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.Q})})})}
+async function renderQrStickers(scope){const grid=$('#qrprintgrid');if(!grid)return;grid.innerHTML='<div class=visitorempty>Loading QR sticker scope…</div>';let source;try{source=(scope&&scope===S.lab&&studentScope==='lab:'+S.lab)?LS(scope):scope?(await db.collection('students').where('lab','==',scope).get({source:'server'})).docs.map(d=>({_:d.id,...d.data()})):await allStudentsOnce();}catch(e){grid.innerHTML='<div class=visitorempty>'+esc(e.message)+'</div>';return}if(!grid.isConnected||$('#qrprintscope')?.value!==scope)return;const list=source.filter(s=>String(s.sid??'').trim());grid.innerHTML=list.length?list.map((s,i)=>`<div class=qrprintitem><div class=qrsticker><div id="qrcode_${i}"></div></div><div class=qrprintwho><b>Serial ${esc(s.sn||'—')} · ${esc(s.sid)}</b><span>${esc(s.nm||'Unnamed student')}</span><span>${esc(labName(s.lab))}</span></div></div>`).join(''):'<div class="card emptyresults">No students with IDs were found in this scope.</div>';requestAnimationFrame(()=>{list.forEach((s,i)=>{const e=document.getElementById('qrcode_'+i);if(!e)return;new QRCode(e,{text:String(s.sid).trim(),width:256,height:256,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.Q})})})}
 function printQrStickers(){document.body.classList.add('qrprinting');const done=()=>{document.body.classList.remove('qrprinting');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);window.print();setTimeout(done,1500)}
 function closeQrStickers(){document.body.classList.remove('qrprinting');$('#modal').innerHTML=''}
 
@@ -602,8 +667,8 @@ function closeQrStickers(){document.body.classList.remove('qrprinting');$('#moda
 /* Serial generation uses a stable global ID-order and never rewrites attendance or grades. */
 async function generateSerials(mode='missing'){
  if(!S.admin)return alert('Only an administrator can generate serial numbers.');
- if(!loadedStudents)return alert('Student roster is still loading.');
- const xs=[...S.studs].sort((a,b)=>String(a.sid||'').localeCompare(String(b.sid||''),undefined,{numeric:true})||String(a.nm||'').localeCompare(String(b.nm||'')));
+ let globalRoster;try{globalRoster=await allStudentsOnce({fresh:true})}catch(e){return alert('Unable to load all students: '+e.message)}
+ const xs=[...globalRoster].sort((a,b)=>String(a.sid||'').localeCompare(String(b.sid||''),undefined,{numeric:true})||String(a.nm||'').localeCompare(String(b.nm||'')));
  const existing=new Set(),duplicates=new Set();
  if(mode!=='all')for(const s of xs){const n=Number(String(s.sn??'').trim());if(Number.isSafeInteger(n)&&n>0){if(existing.has(n))duplicates.add(n);existing.add(n)}}
  const candidates=mode==='all'?xs:xs.filter(s=>String(s.sn??'').trim()==='');
@@ -612,7 +677,7 @@ async function generateSerials(mode='missing'){
  if(!confirm(msg))return;
  const ops=[];let n=1;
  for(const student of candidates){while(existing.has(n))n++;existing.add(n);ops.push({t:'update',ref:St(student._),data:{sn:String(n++)}})}
- try{await commitOps(ops);alert(`Assigned ${ops.length} serial numbers. Existing attendance and grades were not changed.`)}catch(e){alert('Serial generation failed: '+e.message)}
+ try{await commitOps(ops);invalidateRosterCache();alert(`Assigned ${ops.length} serial numbers. Existing attendance and grades were not changed.`)}catch(e){alert('Serial generation failed: '+e.message)}
 }
 
 function parse(rows){if(!rows.length)return[];const h=rows[0].map(x=>String(x).toLowerCase().trim()),f=r=>h.findIndex(x=>r.test(x));
@@ -640,13 +705,13 @@ function parseSisRoster(text){
 }
 async function commitOps(ops){for(let i=0;i<ops.length;i+=400){const b=db.batch();for(const o of ops.slice(i,i+400)){if(o.t=='delete')b.delete(o.ref);else if(o.t=='set')b.set(o.ref,o.data);else b.update(o.ref,o.data)}await b.commit()}}
 async function syncSisRoster(rows,inp){
- const col=db.collection('students'),pool=LS(S.lab),fileIds=new Set(rows.map(q=>norm(q.sid)).filter(Boolean)),keep=new Set(),adds=[];
+ const col=db.collection('students'),pool=LS(S.lab),globalRoster=await allStudentsOnce({fresh:true}),fileIds=new Set(rows.map(q=>norm(q.sid)).filter(Boolean)),keep=new Set(),adds=[];
  const existingById=new Map();for(const s of pool){const k=norm(s.sid);if(k&&!existingById.has(k))existingById.set(k,s)}
  for(const q of rows){const k=norm(q.sid),s=existingById.get(k);if(s)keep.add(s._);else adds.push(q)}
  const rem=pool.filter(s=>!fileIds.has(norm(s.sid)));
  if(!confirm(`Synchronize this lab from the original SIS .xls file?\n\nStudents read from SIS: ${rows.length}\nKeep unchanged: ${keep.size}\nAdd: ${adds.length}\nRemove: ${rem.length}\n\nExisting students keep their attendance, grades, serial number, and stored name.`)){inp.value='';return}
- const ops=[],serials=new Set(S.studs.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let next=1;
- rem.forEach(s=>ops.push({t:'delete',ref:col.doc(s._)}));adds.forEach(q=>{while(serials.has(next))next++;serials.add(next);ops.push({t:'set',ref:col.doc(),data:{lab:S.lab,sn:String(next++),sid:q.sid,nm:q.nm,att:{},alt:{},g:{}}})});await commitOps(ops);
+ const ops=[],serials=new Set(globalRoster.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let next=1;
+ rem.forEach(s=>ops.push({t:'delete',ref:col.doc(s._)}));adds.forEach(q=>{while(serials.has(next))next++;serials.add(next);ops.push({t:'set',ref:col.doc(),data:{lab:S.lab,sn:String(next++),sid:q.sid,nm:q.nm,att:{},alt:{},g:{}}})});await commitOps(ops);invalidateRosterCache();
  alert(`SIS roster synchronized.\nRead: ${rows.length}\nKept unchanged: ${keep.size}\nAdded: ${adds.length}\nRemoved: ${rem.length}`)
 }
 function imp(inp,kind){const f=inp.files[0];if(!f)return;
@@ -657,20 +722,22 @@ function imp(inp,kind){const f=inp.files[0];if(!f)return;
  const r=new FileReader();r.onload=async e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rawRows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}),parsed=parseCourseSerials(rawRows),rows=parsed.rows,col=db.collection('students');
   if(!rows.length)throw new Error('No students were found in the serial file.');
   const sourceNote=parsed.source==='row-order'?`No Serial column was found. LabTrack will use the file order as the course serial: 1 to ${rows.length}.`:'LabTrack found an explicit Serial column and will use it.';
-  if(!confirm(`Import serial numbers for ALL labs?\n\n${sourceNote}\n\nMatching students will have their current serial number overwritten regardless of which lab they attend.`)){inp.value='';return}let upd=0,miss=0,amb=0;const ops=[],byId=new Map(),byName=new Map();for(const s of S.studs){const ik=norm(s.sid),nk=norm(s.nm);if(ik){const a=byId.get(ik)||[];a.push(s);byId.set(ik,a)}if(nk){const a=byName.get(nk)||[];a.push(s);byName.set(nk,a)}}for(const q of rows){let matches=[];if(q.sid)matches=byId.get(norm(q.sid))||[];else if(q.nm)matches=byName.get(norm(q.nm))||[];if(matches.length===1){ops.push({t:'update',ref:col.doc(matches[0]._),data:{sn:String(q.sn??'').trim()}});upd++}else if(matches.length>1)amb++;else miss++}await commitOps(ops);const used=parsed.source==='row-order'?`Row order used as serial: 1–${rows.length}`:'Explicit Serial column used';alert(`Course serial import complete across all labs.\n${used}\nUpdated: ${upd}\nNot found: ${miss}\nAmbiguous (not changed): ${amb}`)
+  if(!confirm(`Import serial numbers for ALL labs?\n\n${sourceNote}\n\nMatching students will have their current serial number overwritten regardless of which lab they attend.`)){inp.value='';return}let upd=0,miss=0,amb=0;const ops=[],byId=new Map(),byName=new Map();for(const s of await allStudentsOnce({fresh:true})){const ik=norm(s.sid),nk=norm(s.nm);if(ik){const a=byId.get(ik)||[];a.push(s);byId.set(ik,a)}if(nk){const a=byName.get(nk)||[];a.push(s);byName.set(nk,a)}}for(const q of rows){let matches=[];if(q.sid)matches=byId.get(norm(q.sid))||[];else if(q.nm)matches=byName.get(norm(q.nm))||[];if(matches.length===1){ops.push({t:'update',ref:col.doc(matches[0]._),data:{sn:String(q.sn??'').trim()}});upd++}else if(matches.length>1)amb++;else miss++}await commitOps(ops);invalidateRosterCache();const used=parsed.source==='row-order'?`Row order used as serial: 1–${rows.length}`:'Explicit Serial column used';alert(`Course serial import complete across all labs.\n${used}\nUpdated: ${upd}\nNot found: ${miss}\nAmbiguous (not changed): ${amb}`)
  }catch(x){alert('Serial import failed: '+x.message)}finally{inp.value=''}};r.readAsArrayBuffer(f)
 }
 function save(rows,name){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Sheet1');XLSX.writeFile(wb,name.replace(/[^\w-]+/g,'_')+'.xlsx')}
 function exLab(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,rows=[['Lab',l.name],['Place',l.place||''],[],['Serial','ID','Name',...rng(W).map(w=>'Week '+w+((l.dates||{})[w]?' - '+(l.dates||{})[w]:'')),'Attended sessions','Absent sessions','Other-lab sessions']];
  LS(l.id).forEach(s=>{const a=s.att||{};rows.push([s.sn,s.sid,s.nm,...rng(W).map(w=>a[w]=='P'?'Attended':a[w]=='A'?'Absent':a[w]=='X'?'Attended in '+labName((s.alt||{})[w]):''),attN(s),absN(s),altN(s)])});save(rows,'Lab_'+l.name)}
-function exGr(){const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];LS(S.gl).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
+async function exGr(){const full=S.gl?(studentScope==='lab:'+S.gl?LS(S.gl):await db.collection('students').where('lab','==',S.gl).get({source:'server'}).then(q=>q.docs.map(d=>({_:d.id,...d.data()})))):await allStudentsOnce({fresh:true});const it=S.cfg.items,rows=[['Serial','ID','Name','Lab',...it.map(i=>i.n+(i.max?' /'+i.max:''))]];[...full].sort(serialCmp).forEach(s=>{const m=calc(s),g=s.g||{};rows.push([s.sn,s.sid,s.nm,S.labs.find(l=>l.id===s.lab)?.name||'',...it.map(i=>i.t=='in'&&g[i.k]==='Abs'?'Abs':m[i.k]??'')])});save(rows,'Grades')}
 
 /* ---------- All-student Excel and lossless JSON exports ---------- */
-function exAllStudentsExcel(){
- if(!S.cfg||!loadedStudents||!loadedLabs)return alert('Student data is still loading. Please try again after your rosters appear.');if(typeof XLSX==='undefined')return alert('The Excel library could not load. Check your internet connection.');
+async function exAllStudentsExcel(){
+ if(WQ.pending.size||WQ.flight)return alert('Please finish saving pending grades before exporting.');
+ if(!S.cfg||!loadedLabs)return alert('Course configuration is still loading.');if(typeof XLSX==='undefined')return alert('The Excel library could not load. Check your internet connection.');
+ let full;try{full=await allStudentsOnce({fresh:true})}catch(e){return alert('Could not retrieve the full roster for Excel export: '+e.message)}
  const items=S.cfg.items||[],configured=new Set(items.map(i=>i.k));
  const seenWeeks=new Set(rng(S.cfg.weeks)),archivedGrades=new Set();
- for(const student of S.studs){
+ for(const student of full){
   for(const key of [...Object.keys(student.att||{}),...Object.keys(student.alt||{})]){const w=Number(key);if(Number.isSafeInteger(w)&&w>0&&w<=999)seenWeeks.add(w)}
   for(const key of Object.keys(student.g||{}))if(!configured.has(key))archivedGrades.add(key)
  }
@@ -680,7 +747,7 @@ function exAllStudentsExcel(){
   'Present (incl. visits)','Absent','Visiting sessions',
   ...items.map(i=>i.n+(i.max?' / '+i.max:'')),...extraGrades.map(k=>'Archived grade · '+k)];
  const rows=[cols];
- allBySerial().forEach(s=>{
+ [...full].sort(serialCmp).forEach(s=>{
   const l=S.labs.find(l=>l.id===s.lab),marks=s.att||{},alt=s.alt||{},calcGrades=calc(s),raw=s.g||{};
   const values=weeks.flatMap(w=>[marks[w]==='P'?'Present':marks[w]==='A'?'Absent':marks[w]==='X'?'Present (visiting)':'',marks[w]==='X'?labName(alt[w]):'',(l?.dates||{})[w]||'']);
   const grades=items.map(i=>i.t==='in'?(raw[i.k]??''):(calcGrades[i.k]??''));
@@ -692,18 +759,20 @@ function exAllStudentsExcel(){
  XLSX.utils.book_append_sheet(wb,sheet,'All students');
  XLSX.writeFile(wb,'LabTrack_All_Students_'+cairoYmd()+'.xlsx');
 }
-function exAllStudentsJson(){
- if(!S.cfg||!loadedStudents||!loadedLabs)return alert('Student data is still loading. Please try again after your rosters appear.');
+async function exAllStudentsJson(){
+ if(WQ.pending.size||WQ.flight)return alert('Please finish saving pending grades before exporting.');
+ if(!S.cfg||!loadedLabs)return alert('Course configuration is still loading.');
+ let full;try{full=await allStudentsOnce({fresh:true})}catch(e){return alert('Could not retrieve the full roster for backup: '+e.message)}
  const snapshot={format:'LabTrack full student backup',schemaVersion:1,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),
   config:JSON.parse(JSON.stringify(S.cfg)),
   labs:S.labs.map(({id,...data})=>({id,...JSON.parse(JSON.stringify(data))})),
-  students:S.studs.map(({_,...data})=>({id:_,...JSON.parse(JSON.stringify(data))}))};
+  students:full.map(({_,...data})=>({id:_,...JSON.parse(JSON.stringify(data))}))};
  const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='LabTrack_Backup_'+cairoYmd()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 
 /* ---------- grades ---------- */
-function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';const all=focusList(S.gl),shown=gradeStudents(),visible=shown.slice(0,pageLimit('gr',[S.gl,S.gq,S.gstatus,S.gmetric,S.gmin,S.gmax].join('|')));return `<div class=card><div class=scopebar><label><span>Students</span><select onchange="S.gl=this.value;S.gq='';detailScrollX=0;render()"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><span class=scopehint>This selection applies to both normal grading and Focus mode. Students are sorted by serial.</span></div><div class=row><button onclick=exTpl()>Export university Excel</button><button class=g onclick=exGr()>Export simple grades</button><button class=g onclick=exAllStudentsExcel()>All student data</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div>
+function vGr(){const it=S.cfg.items,inp=it.filter(i=>i.t=='in');if(!inp.find(i=>i.k===S.gfk))S.gfk=inp[0]?.k||'';const all=focusList(S.gl),shown=gradeStudents(),visible=shown.slice(0,pageLimit('gr',[S.gl,S.gq,S.gstatus,S.gmetric,S.gmin,S.gmax].join('|')));return `<div class=card><div class=scopebar><label><span>Students</span><select onchange="selectGradeLab(this.value)"><option value="">All labs</option>${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.gl?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><span class=scopehint>Selected lab loads only that lab; All labs loads the complete roster while grading is open.</span></div><div class=row><button onclick=exTpl()>Export university Excel</button><button class=g onclick=exGr()>Export simple grades</button><button class=g onclick=exAllStudentsExcel()>All student data</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div>
 ${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10px;margin-top:10px"><span class=m>Focus grading:</span><select class=compact onchange="S.gfk=this.value">${inp.map(i=>`<option value="${i.k}" ${i.k===S.gfk?'selected':''}>${esc(i.n)}</option>`).join('')}</select><button onclick=startGradeFocus()>Start focus mode${S.gq?' · filtered':''}</button><span class=m>${S.gl?esc(labName(S.gl)):'All labs'} · serial order</span></div>`:''}
 <div class=searchbar><input data-f=gq value="${esc(S.gq)}" placeholder="Search student by serial, ID or name" oninput="S.gq=this.value;renderSearch()"><span class=searchcount>Showing ${shown.length} of ${all.length}</span>${S.gq?'<button class=g onclick="S.gq=\'\';render()">Clear</button>':''}</div>
 <div class=gradefilters><label>Academic status<select onchange="S.gstatus=this.value;render()"><option value="">All statuses</option>${SL.map(x=>`<option value="${esc(x)}" ${S.gstatus===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Filter by grade<select onchange="S.gmetric=this.value;render()"><option value="">Any grade</option><option value="__total" ${S.gmetric==='__total'?'selected':''}>Sum of input scores</option>${it.map(x=>`<option value="${esc(x.k)}" ${S.gmetric===x.k?'selected':''}>${esc(x.n)}</option>`).join('')}</select></label><label>Minimum<input type=number step=any value="${esc(S.gmin||'')}" placeholder="Min" oninput="S.gmin=this.value;renderSearch()"></label><label>Maximum<input type=number step=any value="${esc(S.gmax||'')}" placeholder="Max" oninput="S.gmax=this.value;renderSearch()"></label><button class=g onclick="S.gstatus='';S.gmetric='';S.gmin='';S.gmax='';render()">Reset filters</button></div>
@@ -795,6 +864,7 @@ function sharedWeekSelector(){
  const w=currentSharedWeek()?.week||1,max=Math.max(1,+S.cfg?.weeks||12);
  return `<div class=row><select id=sharedWeekChoice aria-label="Current attendance week">${rng(max).map(i=>`<option value="${i}" ${i===w?'selected':''}>Week ${i}</option>`).join('')}</select><button onclick=setSharedAttendanceWeek()>Set shared week</button></div>`;
 }
+function changeDeviceCache(enable){if(enable&&!confirm('Only enable stored offline student data on your own trusted, locked device. The browser will retain student records after you close LabTrack. Continue?')){render();return}localStorage.setItem('labtrack-device-cache',enable?'1':'0');if(!enable)localStorage.setItem('labtrack-clear-cache','1');location.reload()}
 function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Sum'},nm=k=>c.items.find(i=>i.k===k)?.n;
  const desc=i=>i.t=='att'?(i.mode==='none'?'Attendance does not add a grade':i.mode==='bands'?`Attendance bands (${(i.bandRules||[]).length} rules)` :i.mode=='pen'?`max minus ${i.pen} per absence`:'attended / weeks x max'):i.t=='grp'?`${i.agg=='avg'?'average':'sum'} of ${i.top?'highest '+i.top+' of ':''}${(i.src||[]).map(nm).join(', ')}${i.mul!=1?' x '+i.mul:''}`:i.t=='sum'?(i.src||[]).map(nm).join(' + '):'';
  return `<div class=card><h3>Course settings</h3>${S.admin?'':'<p class=m>Only the admin can change grading structure and lock weeks.</p>'}
@@ -805,7 +875,7 @@ function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Su
 <label>Absence warning threshold <span class=m>(warning appears after the student exceeds this number)</span><input type=number min=0 max=30 value="${c.absenceWarn??3}" onchange="Cf().set({absenceWarn:Math.max(0,+this.value||0)},{merge:true})"></label></div>
 <div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
 ${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
-<p class=m>Group: choose assessments and a calculation preset (or a custom highest-N, average/sum and multiplier). Sum: add any items together, including groups and other sums.</p>`:''}</div><div class=card><h3>Student data & backups</h3><p class=m>Export every student from every lab, including attendance and visiting-lab records, scores, and student notes. Excel is a readable table; JSON keeps original document IDs and complete data for a future restore. These exports do not modify Firebase.</p><div class=row><button onclick=exAllStudentsExcel()>Export all students · Excel</button><button class=g onclick=exAllStudentsJson()>Download JSON backup</button></div></div>${tplCards(c)}${securityCard()}`}
+<p class=m>Group: choose assessments and a calculation preset (or a custom highest-N, average/sum and multiplier). Sum: add any items together, including groups and other sums.</p>`:''}</div><div class=card><h3>Firebase read optimization</h3><p class=m>Attendance watches only the selected lab and this week’s visitors. Other-lab search and visitor selection fetch the full roster on demand (temporarily cached in memory). All-lab grading watches everyone until you choose one lab or leave Grades. Exports retrieve a fresh complete roster.</p><label class=ck><input type=checkbox ${localStorage.getItem('labtrack-device-cache')==='1'?'checked':''} onchange="changeDeviceCache(this.checked)">Keep an offline Firestore cache on this trusted device</label><p class=m>Optional. Turn this on only on a private locked device. Turning it off attempts to clear previously stored student data. Browser cache may reduce repeated reconnect reads, but Firebase billing depends on server activity.${cacheWarning?' '+esc(cacheWarning):''}</p></div><div class=card><h3>Student data & backups</h3><p class=m>Export every student from every lab, including attendance and visiting-lab records, scores, and student notes. Excel is a readable table; JSON keeps original document IDs and complete data for a future restore. These exports do not modify Firebase.</p><div class=row><button onclick=exAllStudentsExcel()>Export all students · Excel</button><button class=g onclick=exAllStudentsJson()>Download JSON backup</button></div></div>${tplCards(c)}${securityCard()}`}
 
 function bandRow(r={},idx=0){return `<div class="row band-row" style="border-top:1px solid var(--b);padding-top:6px"><label>Condition<select class=band-op><option value="&lt;=" ${r.op==='<='?'selected':''}>≤</option><option value="=" ${r.op==='='?'selected':''}>=</option><option value="&gt;=" ${r.op==='>='?'selected':''}>≥</option></select></label><label>Count<input class=band-n type=number min=0 value="${esc(r.n??0)}" style="width:90px"></label><label>Grade<input class=band-grade type=number min=0 step=.25 value="${esc(r.grade??0)}" style="width:90px"></label><button type=button class=d onclick="this.closest('.band-row').remove()">Remove</button></div>`}
 function addBandRow(){const div=document.createElement('div');div.innerHTML=bandRow({op:'<=',n:0,grade:0});$('#bandRows')?.appendChild(div.firstElementChild)}
@@ -861,7 +931,7 @@ async function exTpl(){const c=S.cfg,m=Object.fromEntries(TC.map(([k])=>[k,templ
  if(!TC.every(([k])=>m[k].length&&m[k].every(it)))return alert('Open Settings → Excel template and map at least one grading item to each official column.');
  const targets={mid:10,cw:20,pr:30,fin:40},diff=TC.filter(([k])=>Math.abs(m[k].reduce((n,id)=>n+(+it(id).max||0),0)-targets[k])>.001).map(([k,n])=>n);
  if(diff.length&&!confirm('Mapped maximum differs from the university template for: '+diff.join(', ')+'. Continue anyway?'))return;
- const ss=LS(S.gl);if(ss.length>709)return alert('The template holds 709 students at most.');
+ const ss=(S.gl?((studentScope==='lab:'+S.gl&&loadedStudents)?LS(S.gl):await db.collection('students').where('lab','==',S.gl).get({source:'server'}).then(q=>q.docs.map(d=>({_:d.id,...d.data()})))):await allStudentsOnce({fresh:true})).sort(serialCmp);if(ss.length>709)return alert('The template holds 709 students at most.');
  let templateB64=OFFICIAL_GRADE_TEMPLATE_B64;
  if(c.templateMode!=='official'){const t=await db.doc('cfg/template').get();if(t.exists&&t.data().b64)templateB64=t.data().b64;else if(c.templateMode==='custom')return alert('The custom template is missing. Choose the included official template in Settings.')}
  try{
