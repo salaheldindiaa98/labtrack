@@ -177,6 +177,23 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 .exam-dialog .exam-preview{white-space:pre-line;background:#f4f6fa;border:1px solid var(--b);border-radius:6px;text-align:center;padding:10px;line-height:1.35;font-weight:650;font-size:12px}
 .exam-dialog .exam-status{min-height:18px;font-size:12px;color:var(--m)}
 @media(max-width:520px){.exam-dialog{padding:12px!important}.exam-dialog .exam-fields{grid-template-columns:1fr}}
+
+/* v31: non-destructive SIS roster reconciliation */
+.roster-dialog{width:min(760px,100%)!important;max-width:760px!important;max-height:92dvh!important;overflow:auto!important}
+.roster-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0}
+.roster-stat{background:#f4f6fa;border:1px solid var(--b);border-radius:6px;padding:9px 11px}
+.roster-stat b{display:block;font-size:24px;line-height:1.1}
+.roster-stat span{font-size:12px;color:var(--m)}
+.roster-group{margin:9px 0;border:1px solid var(--b);border-radius:6px;background:#fff}
+.roster-group summary{cursor:pointer;padding:9px 11px;font-weight:700;list-style:revert}
+.roster-group .roster-list{max-height:180px;overflow:auto;padding:0 11px 8px}
+.roster-person{padding:6px 0;border-top:1px solid #eef1f5;font-size:12px;overflow-wrap:anywhere}
+.roster-person small{display:block;color:var(--m)}
+.roster-dialog .roster-safe{padding:11px;background:#eff8f2;border:1px solid #b7dec4;border-radius:7px;color:#12532e;font-size:13px}
+.roster-dialog .roster-warning{padding:10px;background:#fff3cd;border:1px solid #f2d58d;border-radius:7px;color:#805400;font-size:13px}
+.roster-dialog .roster-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.roster-dialog .roster-buttons button{flex:1;min-width:130px}
+@media(max-width:520px){.roster-dialog{padding:12px!important}}
 </style></head><body>
 <div id="app"></div><div id="modal"></div><div id="studentmodal"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -187,7 +204,7 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const APP_VERSION='30.0';
+const APP_VERSION='31.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
@@ -576,7 +593,7 @@ function render(){if(!S.cfg||!S.user||S.profile?.approved!==true)return;
  if(!weekSessionLoaded){$('#app').innerHTML=`<main><div class=card><h2>Connecting to Firebase week preferences</h2>${weekSessionError?`<p class=e>${esc(weekSessionError)}</p><p>Before using v27, publish its updated Firestore security rules. The new rule grants each approved instructor access to their own week session.</p><button onclick=auth.signOut()>Sign out</button>`:'<p class=m>Reading the current shared week and your last session.</p>'}</div></main>`;return}
  const a=document.activeElement,f=a&&a.dataset&&a.dataset.f,ss=a&&typeof a.selectionStart==='number'?a.selectionStart:null,se=a&&typeof a.selectionEnd==='number'?a.selectionEnd:null;
  const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';watchInstructors();watchStudentsForView();
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v30</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v31</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
 <nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="openTab('${k}')">${n}</button>`).join('')}</nav>
 <main>${scopeError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(scopeError)}</div>`:''}${visitorError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(visitorError)}</div>`:''}${!loadedStudents&&(S.tab==='att'||S.tab==='gr')?'<div class=card>Loading selected student roster from Firebase…</div>':''}${weekAdvanceError?`<div class=card style="border-color:#f1b6ad;color:var(--r)"><b>Firebase week synchronization error</b><p>${esc(weekAdvanceError)}</p><p class=m>Publish the v27 Firestore security rules and reopen LabTrack to retry.</p></div>`:''}${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);if(e){e.focus();if(ss!==null&&typeof e.setSelectionRange==='function'){const L=String(e.value??'').length;e.setSelectionRange(Math.min(ss,L),Math.min(se??ss,L))}}}paintSaveState();requestAnimationFrame(()=>applySyncedScroll())}
@@ -607,7 +624,7 @@ function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(
  <div class=att-h5-session><div class=att-h5-session-title><span>Attendance session · Shared default: Week ${currentSharedWeek().week}${S.aw!==currentSharedWeek().week?' · Viewing Week '+S.aw:''}</span><span class="badge ${locked?'warn':'blue'}">${locked?'Locked':'Unlocked'}</span></div><div class=att-h5-session-body><label>Session week<select onchange="selectAttendanceWeek(this.value)">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label><label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>${S.admin?`<button class="g weeklock" onclick="lock(${S.aw})">${locked?'Unlock':'Lock'} Week ${S.aw}</button>`:'<span></span>'}</div></div>
  <div class=att-h5-actions><button class="g grow" onclick=startAttendanceFocus() ${locked&&!S.admin?'disabled':''}>Focus mode${S.aq?' · filtered':''}</button><button class=grow onclick=startQrAttendance() ${locked&&!S.admin?'disabled':''}>▣ Scan QR</button><button class=grow onclick=visitorModal() ${locked&&!S.admin?'disabled':''}>+ Visiting student</button><button class="g grow" onclick=openExamAttendanceExport()>Exam attendance sheets ↓</button>${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div><div class=att-h5-policy><span class="badge blue">Other-lab allowance: ${lim}</span>${visitingFocusSkipped?`<span class="badge blue">Focus skips ${visitingFocusSkipped} visiting student${visitingFocusSkipped===1?'':'s'} this week</span>`:''}<span class=badge>Warning after &gt; ${thr} absences</span></div>
  <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search all labs by serial, ID or name" oninput="searchAttendanceInput(this.value)"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';render()">Clear</button>':''}</div>
- <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)"><button class=g onclick="$('#f1').click()">Sync SIS roster (.xls)</button><button class=g onclick="$('#f2').click()">Upload course serials</button>${S.admin?'<button class=g onclick="generateSerials(\'missing\')">Assign missing serials</button><button class=g onclick="generateSerials(\'all\')">Rebuild serials</button>':''}<button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button><button class=g onclick=openExamAttendanceExport()>Exam attendance sheets (all labs)</button><button class=g onclick=exAllStudentsExcel()>All students Excel</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
+ <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)"><button class=g onclick="$('#f1').click()">Safely update SIS roster (.xls)</button><button class=g onclick="$('#f2').click()">Upload course serials</button>${S.admin?'<button class=g onclick="generateSerials(\'missing\')">Assign missing serials</button><button class=g onclick="generateSerials(\'all\')">Rebuild serials</button>':''}<button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button><button class=g onclick=openExamAttendanceExport()>Exam attendance sheets (all labs)</button><button class=g onclick=exAllStudentsExcel()>All students Excel</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
  ${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class="namecell ${flag?'flagname':''}"><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class="badge blue">Att ${ac}</span>${s.st&&s.st!==SL[0]?`<span class="badge warn">${esc(s.st)}</span>`:''}${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ Abs ${bc}</button>`:`<span class=badge>Abs ${bc}</span>`}<span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">Other ${xc}/${lim}</span><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${rng(W).map(w=>{const v=a[w]||'',title=(l.dates||{})[w]?`Week ${w} · ${shortDate((l.dates||{})[w])}`:`Week ${w}`,extra=v=='X'?` · Attended in ${labName((s.alt||{})[w])}`:'';return `<div class=attcell><button title="${esc(title+extra)}" class="attplain ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="if(syncClickGuard())return;mark('${s._}',${w},'${v}')"><span class=attweek>W${w}${S.cfg.locked?.[w]?' 🔒':''}</span><span class=attmark>${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</span></button></div>`}).join('')}</div></div></div></div>`}).join('')}</div>`:foreign.length?`<div class=externalresults><div class=externalresults-title>Student${foreign.length===1?'':'s'} found outside ${esc(l.name)}</div>${foreign.map(s=>`<div class=externalstudent><div><div class=externalstudent-name>${esc(s.nm||'Unnamed student')}</div><div class=externalstudent-meta>Serial ${esc(s.sn||'—')} · ID ${esc(s.sid||'—')}</div></div><div class=externalstudent-action><span class=badge>${esc(labName(s.lab))}</span><button onclick="goToAttendanceLab('${s.lab}')">Go to ${esc(labName(s.lab))}</button></div></div>`).join('')}</div>`:'<div class="card emptyresults">No students match your search in any lab.</div>'}${moreStudents('att',shown.length,visible.length)}`}
 
 function setWeekDate(w,v){if(S.lab)db.doc('labs/'+S.lab).update({['dates.'+w]:v})}
@@ -708,7 +725,7 @@ function parseCourseSerials(rawRows){
 }
 function parseSisRoster(text){
  const clean=v=>String(v??'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(),out=[],seen=new Set();
- const add=(cells)=>{if(cells.length<3)return;const sid=clean(cells[1]),nm=clean(cells[2]);if(!sid||!nm||/^id$/i.test(sid)||/^name$/i.test(nm))return;const k=norm(sid);if(!k||seen.has(k))return;seen.add(k);out.push({sn:'',sid,nm})};
+ const add=(cells)=>{if(cells.length<3)return;const sid=clean(cells[1]),nm=clean(cells[2]);if(/^id$/i.test(sid)||/^name$/i.test(nm)||(!sid&&!nm))return;if(!sid||!nm){(out.invalid||(out.invalid=[])).push({sn:'',sid,nm});return}const k=norm(sid);if(!k)return;if(seen.has(k)){(out.duplicates||(out.duplicates=[])).push({sn:'',sid,nm});return}seen.add(k);out.push({sn:'',sid,nm})};
  try{const d=new DOMParser().parseFromString(String(text||''),'text/html');for(const tr of d.querySelectorAll('table tr'))add([...tr.children].filter(x=>/^(TD|TH)$/i.test(x.tagName)).map(x=>x.textContent||''))}catch(e){}
  if(out.length)return out;
  /* Oracle SIS exports an HTML table with an .xls extension and may omit closing </tr> tags. */
@@ -717,16 +734,119 @@ function parseSisRoster(text){
  return out
 }
 async function commitOps(ops){for(let i=0;i<ops.length;i+=400){const b=db.batch();for(const o of ops.slice(i,i+400)){if(o.t=='delete')b.delete(o.ref);else if(o.t=='set')b.set(o.ref,o.data);else b.update(o.ref,o.data)}await b.commit()}}
-async function syncSisRoster(rows,inp){
- const col=db.collection('students'),pool=LS(S.lab),globalRoster=await allStudentsOnce({fresh:true}),fileIds=new Set(rows.map(q=>norm(q.sid)).filter(Boolean)),keep=new Set(),adds=[];
- const existingById=new Map();for(const s of pool){const k=norm(s.sid);if(k&&!existingById.has(k))existingById.set(k,s)}
- for(const q of rows){const k=norm(q.sid),s=existingById.get(k);if(s)keep.add(s._);else adds.push(q)}
- const rem=pool.filter(s=>!fileIds.has(norm(s.sid)));
- if(!confirm(`Synchronize this lab from the original SIS .xls file?\n\nStudents read from SIS: ${rows.length}\nKeep unchanged: ${keep.size}\nAdd: ${adds.length}\nRemove: ${rem.length}\n\nExisting students keep their attendance, grades, serial number, and stored name.`)){inp.value='';return}
- const ops=[],serials=new Set(globalRoster.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let next=1;
- rem.forEach(s=>ops.push({t:'delete',ref:col.doc(s._)}));adds.forEach(q=>{while(serials.has(next))next++;serials.add(next);ops.push({t:'set',ref:col.doc(),data:{lab:S.lab,sn:String(next++),sid:q.sid,nm:q.nm,att:{},alt:{},g:{}}})});await commitOps(ops);invalidateRosterCache();
- alert(`SIS roster synchronized.\nRead: ${rows.length}\nKept unchanged: ${keep.size}\nAdded: ${adds.length}\nRemoved: ${rem.length}`)
+/* v31: A SIS spreadsheet is evidence of enrollment, not authority to undo manually
+   changed lab assignments. Reconcile IDs against ALL labs before adding anything. */
+let SIS_IMPORT=null;
+function planSisRoster(rows,all,lab){
+ const byId=new Map(),fileSeen=new Set();
+ for(const s of all){const k=norm(s.sid);if(!k)continue;const xs=byId.get(k)||[];xs.push(s);byId.set(k,xs)}
+ const plan={same:[],other:[],newStudents:[],ambiguous:[],missing:[],repeated:[...(rows.duplicates||[])],invalid:[...(rows.invalid||[])]};
+ for(const q of rows){
+  const k=norm(q.sid);
+  if(!k){plan.invalid.push(q);continue}
+  if(fileSeen.has(k)){plan.repeated.push(q);continue}
+  fileSeen.add(k);
+  const matches=byId.get(k)||[];
+  if(matches.length>1)plan.ambiguous.push({file:q,matches});
+  else if(matches.length===1){
+   const result={file:q,existing:matches[0]};
+   (matches[0].lab===lab?plan.same:plan.other).push(result);
+  }else plan.newStudents.push(q);
+ }
+ plan.missing=all.filter(s=>s.lab===lab&&!fileSeen.has(norm(s.sid)));
+ return plan;
 }
+function sisPlanSignature(p){
+ const sort=x=>x.slice().sort().join('|');
+ return JSON.stringify([
+  sort(p.same.map(x=>x.file.sid+'@'+x.existing._+'@'+x.existing.lab)),
+  sort(p.other.map(x=>x.file.sid+'@'+x.existing._+'@'+x.existing.lab)),
+  sort(p.newStudents.map(x=>norm(x.sid))),
+  sort(p.ambiguous.map(x=>norm(x.file.sid))),
+  sort(p.missing.map(x=>x._+'@'+x.lab))
+ ]);
+}
+function rosterItemText(q){return `${q.sid||'No ID'} · ${q.nm||'Unnamed student'}`}
+function renderSisPreview(){
+ const si=SIS_IMPORT,box=$('#modal');if(!si||!box)return;
+ const p=si.plan;
+ const section=(name,items,show,open=false)=>`<details class=roster-group ${open?'open':''}><summary>${esc(name)} (${items.length})</summary><div class=roster-list>${items.length?items.map(x=>`<div class=roster-person>${esc(show(x))}</div>`).join(''):'<p class=m>None</p>'}</div></details>`;
+ box.innerHTML=`<div class=ov role=presentation><div class="card roster-dialog" role=dialog aria-modal=true aria-label="Safe SIS roster update"><h2>Review SIS roster update</h2><p class=m><b>Selected lab:</b> ${esc(labName(si.lab))} · ${esc(si.fileName)} · ${si.rows.length} students in SIS</p>
+ <div class=roster-safe><b>Protected:</b> Existing student IDs are never duplicated, never moved back to their old lab, and never deleted. Attendance, grades, notes, and academic status remain untouched.</div>
+ <div class=roster-stats>
+ <div class=roster-stat><b>${p.same.length}</b><span>Already in this lab — unchanged</span></div>
+ <div class=roster-stat><b>${p.other.length}</b><span>Found in another lab — remain there</span></div>
+ <div class=roster-stat><b>${p.newStudents.length}</b><span>Genuinely new IDs — can add</span></div>
+ <div class=roster-stat><b>${p.missing.length}</b><span>In this lab but absent from file — retained</span></div></div>
+ ${(p.ambiguous.length||p.repeated.length||p.invalid.length)?`<div class=roster-warning>Some IDs need review: ${p.ambiguous.length} duplicate IDs already in LabTrack, ${p.repeated.length} repeated IDs in the SIS file, ${p.invalid.length} missing IDs. These entries will not create records.</div>`:''}
+ ${section('Already in this lab',p.same,x=>rosterItemText(x.file))}
+ ${section('Previously moved / currently in another lab',p.other,x=>rosterItemText(x.file)+' — current: '+labName(x.existing.lab),p.other.length>0)}
+ ${section('New students to add',p.newStudents,rosterItemText,p.newStudents.length>0)}
+ ${section('Current lab students missing from SIS (kept)',p.missing,x=>rosterItemText(x),p.missing.length>0)}
+ ${section('Duplicate IDs in LabTrack (skipped)',p.ambiguous,x=>rosterItemText(x.file)+' — matches '+x.matches.length+' records',p.ambiguous.length>0)}
+ ${section('Repeated or invalid SIS rows (skipped)',[...p.repeated,...p.invalid],rosterItemText)}
+ <p class=m>Students missing from the SIS file are <b>not</b> removed or marked absent. You may review and transfer or deactivate them separately if appropriate. Imported names and serial numbers do not overwrite existing records.</p>
+ <div class=roster-buttons><button class=g onclick=downloadSisReconciliation()>Download review Excel</button><button class=g onclick=closeSisPreview()>Cancel</button><button onclick=confirmSisRosterUpdate() id=sisApply ${!p.newStudents.length?'disabled':''}>Add ${p.newStudents.length} new student${p.newStudents.length===1?'':'s'}</button></div>
+ <p class=m id=sisStatus></p></div></div>`;
+}
+function closeSisPreview(){if(SIS_IMPORT?.busy)return;SIS_IMPORT=null;$('#modal').innerHTML=''}
+function downloadSisReconciliation(){
+ if(!SIS_IMPORT)return;
+ if(typeof XLSX==='undefined')return alert('Excel library is unavailable.');
+ const si=SIS_IMPORT,p=si.plan,rows=[['Result','Student ID','SIS name','Current Lab','Saved Student Name','Action']];
+ p.same.forEach(x=>rows.push(['Already in this lab',x.file.sid,x.file.nm,labName(x.existing.lab),x.existing.nm,'Keep unchanged']));
+ p.other.forEach(x=>rows.push(['Found in another lab',x.file.sid,x.file.nm,labName(x.existing.lab),x.existing.nm,'Keep existing lab assignment']));
+ p.newStudents.forEach(x=>rows.push(['New student',x.sid,x.nm,labName(si.lab),'','Add on approval']));
+ p.missing.forEach(x=>rows.push(['Missing from SIS',x.sid,x.nm,labName(x.lab),x.nm,'Keep; review manually']));
+ p.ambiguous.forEach(x=>rows.push(['Duplicate ID in LabTrack',x.file.sid,x.file.nm,x.matches.map(s=>labName(s.lab)).join('; '),'','Skip; review duplicate records']));
+ p.repeated.forEach(x=>rows.push(['Repeated SIS ID',x.sid,x.nm,'','','Skip repeated row']));
+ p.invalid.forEach(x=>rows.push(['Missing SIS ID',x.sid,x.nm,'','','Skip invalid row']));
+ const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+ ws['!cols']=[{wch:26},{wch:19},{wch:38},{wch:24},{wch:38},{wch:36}];
+ XLSX.utils.book_append_sheet(wb,ws,'SIS reconciliation');
+ XLSX.writeFile(wb,`LabTrack_SIS_Review_${String(labName(si.lab)).replace(/[^a-z0-9_-]/gi,'_')}.xlsx`);
+}
+async function syncSisRoster(rows,inp){
+ if(!S.lab||!S.labs.some(l=>l.id===S.lab))throw new Error('Select a valid lab before importing.');
+ if(!rows.length)throw new Error('The SIS roster contains no valid student rows.');
+ // Fresh full-roster read is intentional: matching only the selected lab caused
+ // duplicate records and deletion of transferred students in older versions.
+ const lab=S.lab,all=await allStudentsOnce({fresh:true});
+ SIS_IMPORT={lab,rows,fileName:inp?.files?.[0]?.name||'SIS roster',plan:planSisRoster(rows,all,lab),busy:false};
+ renderSisPreview();
+}
+function sisNewDocId(sid){const id='sis_'+encodeURIComponent(norm(sid));if(new TextEncoder().encode(id).length>1400)throw new Error('A student ID is too long. Please review the file.');return id}
+async function confirmSisRosterUpdate(){
+ const si=SIS_IMPORT;if(!si||si.busy)return;
+ const status=$('#sisStatus');si.busy=true;const btn=$('#sisApply');if(btn)btn.disabled=true;
+ if(status)status.textContent='Rechecking all student IDs before saving…';
+ try{
+  if(si.lab!==S.lab)throw new Error('The selected lab changed. Cancel and re-import the file.');
+  const fresh=await allStudentsOnce({fresh:true}),now=planSisRoster(si.rows,fresh,si.lab);
+  if(sisPlanSignature(now)!==sisPlanSignature(si.plan)){
+   si.plan=now;si.busy=false;renderSisPreview();const freshStatus=$('#sisStatus');if(freshStatus)freshStatus.textContent='The roster changed since the preview. Review the updated counts before saving.';return;
+  }
+  if(!now.newStudents.length){si.busy=false;renderSisPreview();return}
+  const existingSerials=new Set(fresh.map(s=>Number(s.sn)).filter(n=>Number.isSafeInteger(n)&&n>0));let serial=1,created=0,skipped=0;
+  // New IDs use a stable document path with a Firestore transaction. Two
+  // simultaneous uploads cannot overwrite the same new student's document.
+  for(const q of now.newStudents){
+   while(existingSerials.has(serial))serial++;
+   const assigned=serial++;existingSerials.add(assigned);
+   const ref=db.collection('students').doc(sisNewDocId(q.sid));
+   const didCreate=await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(snap.exists)return false;
+    tx.set(ref,{lab:si.lab,sn:String(assigned),sid:q.sid,nm:q.nm,att:{},alt:{},g:{}});
+    return true;
+   });
+   if(didCreate)created++;else skipped++;
+  }
+  invalidateRosterCache();si.busy=false;closeSisPreview();
+  alert(`Safe SIS update complete for ${labName(si.lab)}.\nNew students added: ${created}\nExisting in this lab: ${now.same.length} (unchanged)\nPreviously moved to other labs: ${now.other.length} (unchanged)\nAbsent from uploaded SIS: ${now.missing.length} (retained)\nDuplicate/invalid ID entries: ${now.ambiguous.length+now.repeated.length+now.invalid.length} (skipped)${skipped?'\nNew IDs already created by another update: '+skipped:''}\nNo existing student attendance, grades, or lab assignments were changed.`)
+ }catch(e){si.busy=false;if(status)status.textContent='Update stopped: '+e.message+(e.message.includes('permission')?' Check Firebase access.':'')+' If any earlier new students were added, the next preview will recognize them instead of adding duplicates.';if(btn)btn.disabled=false;console.error(e)}
+}
+
 function imp(inp,kind){const f=inp.files[0];if(!f)return;
  if(kind==0){
   if(!/\.xls$/i.test(f.name)){alert('Please upload the original SIS .xls roster file. No conversion to .xlsx is needed.');inp.value='';return}
