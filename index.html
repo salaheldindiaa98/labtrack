@@ -204,7 +204,7 @@ pre{background:#e8ecf3;padding:8px;border-radius:6px;overflow:auto;font-size:12p
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const APP_VERSION='31.0';
+const APP_VERSION='32.0';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=n=>Array.from({length:n},(_,i)=>i+1),FV=()=>firebase.firestore.FieldValue.delete();
 const DEF=[['att','Attendance','att',10],['pe1','Practical exam 1','in',10],['pe2','Practical exam 2','in',10],['ex1','Exam 1','in',10],['ex2','Exam 2','in',10],['ex3','Exam 3','in',10],['pf','Portfolio','in',10],['fin','Final grade','in',40]].map(([k,n,t,max])=>({k,n,t,max,mode:'ratio',pen:1}));
@@ -219,34 +219,72 @@ const PAGE=40;
 function noteSave(state,message=''){WQ.state=state;WQ.message=message;paintSaveState()}
 function paintSaveState(){
  const count=WQ.pending.size+(WQ.flight?.length||0);
- const name=WQ.state==='saving'?'Saving…':WQ.state==='unsaved'?`Unsaved (${count}) · retry`:WQ.state==='saved'?'Saved ✓':'';
+ const name=WQ.state==='saving'?'Saving safely…':WQ.state==='unsaved'?`Unsaved (${count}) · retry`:WQ.state==='saved'?'Saved ✓':'';
  document.querySelectorAll('.lab-save').forEach(x=>{x.className='lab-save '+WQ.state;x.textContent=name;x.title=WQ.message||name});document.querySelectorAll('.lab-retry').forEach(x=>{x.style.display=WQ.state==='unsaved'?'inline-block':'none'});
 }
 function setPath(o,path,v){const parts=path.split('.');let at=o;for(let i=0;i<parts.length-1;i++){if(!at[parts[i]]||typeof at[parts[i]]!=='object')at[parts[i]]={};at=at[parts[i]]}if(v===DEL)delete at[parts.at(-1)];else at[parts.at(-1)]=v}
 function applyPaths(student,fields){if(!student)return;for(const [k,v] of Object.entries(fields))setPath(student,k,v);gradeCalcCache.delete(student._)}
 function mergeWQOverlay(){const byId=new Map(S.studs.map(s=>[s._,s]));for(const job of WQ.flight||[])applyPaths(byId.get(job.id),job.fields);for(const job of WQ.pending.values())applyPaths(byId.get(job.id),job.fields)}
+function fieldValue(obj,path){
+ let v=obj;for(const k of path.split('.')){if(v===null||v===undefined)return undefined;v=v[k]}return v;
+}
+function sameStoredValue(a,b){return a===b||(a===undefined&&b===null)||(a===null&&b===undefined)}
 function queueStudentWrite(id,fields){
- if(!S.user||!S.studs.some(s=>s._===id))return;
- const item=WQ.pending.get(id)||{id,fields:{}};Object.assign(item.fields,fields);WQ.pending.set(id,item);
- applyPaths(S.studs.find(s=>s._===id),fields);
- noteSave('saving');renderSoon();clearTimeout(WQ.timer);
- WQ.timer=setTimeout(flushStudentWrites,240);
+ const student=S.studs.find(s=>s._===id);if(!S.user||!student)return;
+ const old=WQ.pending.get(id)||{id,fields:{},base:{}};
+ for(const [path,value] of Object.entries(fields)){
+  if(!(path in old.base))old.base[path]=fieldValue(student,path);
+  old.fields[path]=value;
+ }
+ WQ.pending.set(id,old);
+ applyPaths(student,fields);noteSave('saving');renderSoon();
+ clearTimeout(WQ.timer);WQ.timer=setTimeout(flushStudentWrites,240);
 }
 async function flushStudentWrites(){
  clearTimeout(WQ.timer);WQ.timer=0;clearTimeout(WQ.retryTimer);
  if(WQ.flight||!WQ.pending.size||!db||!S.user)return;
  const jobs=[...WQ.pending.values()];WQ.pending.clear();WQ.flight=jobs;
- noteSave('saving');let done=0;
+ noteSave('saving');let done=0;const rejected=[];
  try{
-  for(;done<jobs.length;done+=400){const batch=db.batch();for(const job of jobs.slice(done,done+400)){
-   const f={};for(const [k,v] of Object.entries(job.fields))f[k]=v===DEL?FV():v;
-   batch.update(St(job.id),f);
-  }await batch.commit()}
-  WQ.flight=null;WQ.retries=0;invalidateRosterCache();
-  if(WQ.pending.size)WQ.timer=setTimeout(flushStudentWrites,80);else noteSave('saved');
+  // A transaction reads the latest student document and verifies ONLY the
+  // particular grade/status fields being edited. Different fields may be
+  // changed safely by different instructors; same-field edits cannot silently
+  // overwrite each other. Groups retain one network round trip per 25 students.
+  for(;done<jobs.length;done+=25){
+   const group=jobs.slice(done,done+25);
+   const failed=await db.runTransaction(async tx=>{
+    const docs=[];
+    for(const job of group)docs.push(await tx.get(St(job.id)));
+    const conflicts=[];
+    for(let i=0;i<group.length;i++){
+     const job=group[i],snap=docs[i];
+     if(!snap.exists){conflicts.push(job);continue}
+     const live=snap.data();let changed=false;
+     for(const [path,v] of Object.entries(job.fields)){
+      const latest=fieldValue(live,path),expected=job.base?.[path];
+      if(!sameStoredValue(latest,expected)&&!sameStoredValue(latest,v===DEL?undefined:v))changed=true;
+     }
+     if(changed){conflicts.push(job);continue}
+     const data={};for(const [key,v] of Object.entries(job.fields))data[key]=v===DEL?FV():v;
+     tx.update(St(job.id),data);
+    }
+    return conflicts;
+   });
+   rejected.push(...failed);
+  }
+  WQ.flight=null;WQ.retries=0;invalidateRosterCache();syncStudentView();
+  if(rejected.length){
+   if(WQ.pending.size)WQ.timer=setTimeout(flushStudentWrites,100);
+   noteSave('unsaved',`${rejected.length} changes were not applied because another instructor edited the same student field.`);
+   alert(`${rejected.length} student change(s) were NOT saved because the records changed on another device. Latest server values are shown. Review the grades/status and enter your intended changes again.`);
+  }else if(WQ.pending.size){WQ.timer=setTimeout(flushStudentWrites,80)}else noteSave('saved');
  }catch(e){
   WQ.flight=null;
-  for(const job of jobs.slice(done)){const newer=WQ.pending.get(job.id);WQ.pending.set(job.id,{id:job.id,fields:{...job.fields,...(newer?.fields||{})}})}
+  for(const job of jobs.slice(done)){
+   const newer=WQ.pending.get(job.id);const base={...(job.base||{})};
+   if(newer)for(const [k,v] of Object.entries(newer.base||{}))if(!(k in base))base[k]=v;
+   WQ.pending.set(job.id,{id:job.id,fields:{...job.fields,...(newer?.fields||{})},base});
+  }
   noteSave('unsaved',String(e?.message||e));
   if(/permission-denied|unauthenticated|invalid-argument|not-found|failed-precondition/.test(String(e?.code||''))){alert('Student changes were NOT saved. Check permission or data and choose Retry save. '+e.message)}
   else{WQ.retries++;WQ.retryTimer=setTimeout(flushStudentWrites,Math.min(30000,1500*2**Math.min(WQ.retries,4)))}
@@ -326,11 +364,30 @@ async function allStudentsOnce({fresh=false}={}){
  try{return await task}finally{if(rosterPromise===task)rosterPromise=null}
 }
 function invalidateRosterCache(){rosterCache=null;rosterCacheAt=0}
+let externalSearchDocs=[],externalSearchToken=0,externalSearchTimer=0,externalSearchState='';
 async function loadGlobalSearch(){
- if(!S.aq.trim()||S.tab!=='att'||!S.user)return;
- try{await allStudentsOnce();if(S.tab==='att'&&S.aq)renderSoon()}catch(e){scopeError='Search across other labs failed: '+e.message;renderSoon()}
+ const text=String(S.aq||'').trim(),token=++externalSearchToken;
+ externalSearchDocs=[];externalSearchState='';
+ if(!text||S.tab!=='att'||!S.user)return;
+ // An exact ID query costs only the matching documents, not the whole roster.
+ // For a partial name/serial, the user can explicitly request global search.
+ try{
+  const q=await db.collection('students').where('sid','==',text).limit(3).get();
+  if(token!==externalSearchToken)return;
+  externalSearchDocs=q.docs.map(d=>({_:d.id,...d.data()}));renderSoon();
+ }catch(e){if(token===externalSearchToken){externalSearchState='Exact student-ID search failed: '+e.message;renderSoon()}}
 }
-function searchAttendanceInput(text){S.aq=text;renderSearch();if(String(text).trim())loadGlobalSearch()}
+function searchAttendanceInput(value){
+ S.aq=value;externalSearchDocs=[];externalSearchState='';
+ clearTimeout(externalSearchTimer);externalSearchToken++;renderSearch();
+ if(String(value||'').trim().length>=5)externalSearchTimer=setTimeout(loadGlobalSearch,650);
+}
+async function searchAllLabsExplicit(){
+ if(!S.aq.trim())return;
+ externalSearchState='Searching all labs…';renderSoon();
+ try{const all=await allStudentsOnce();if(!S.aq.trim())return;externalSearchDocs=all;externalSearchState='';renderSoon()}
+ catch(e){externalSearchState='Global search failed: '+e.message;renderSoon()}
+}
 function openTab(tab){
  if(tab==='gr'&&!S.gradeLabInitialized){S.gl=S.lab;S.gradeLabInitialized=true}
  S.tab=tab;watchStudentsForView();render();
@@ -566,7 +623,7 @@ const altN=s=>rng(S.cfg.weeks).filter(w=>(s.att||{})[w]=='X').length;
 const shortDate=d=>{if(!d)return'';const x=new Date(d+'T00:00:00');return isNaN(x)?d:x.toLocaleDateString(undefined,{month:'short',day:'numeric'})};
 const studentMatch=(s,q)=>{q=norm(q);return !q||norm(s.sn).includes(q)||norm(s.sid).includes(q)||norm(s.nm).includes(q)};
 const attStudents=()=>LS(S.lab).filter(s=>studentMatch(s,S.aq));
-const attendanceUniversalMatches=()=>S.aq?(rosterCache||S.studs).filter(s=>studentMatch(s,S.aq)).sort(serialCmp):[];
+const attendanceUniversalMatches=()=>S.aq?[...new Map([...(rosterCache||[]),...externalSearchDocs,...S.studs].filter(s=>studentMatch(s,S.aq)).map(s=>[s._,s])).values()].sort(serialCmp):[];
 const gradeStudents=()=>gradeFiltered();
 function calc(s){gradeConfigCheck();if(gradeCalcCache.has(s._))return gradeCalcCache.get(s._);const m={},it=S.cfg.items,g=s.g||{};
  const v=k=>{if(k in m)return m[k];const i=it.find(x=>x.k===k);m[k]=null;if(!i)return null;let r=null;
@@ -593,7 +650,7 @@ function render(){if(!S.cfg||!S.user||S.profile?.approved!==true)return;
  if(!weekSessionLoaded){$('#app').innerHTML=`<main><div class=card><h2>Connecting to Firebase week preferences</h2>${weekSessionError?`<p class=e>${esc(weekSessionError)}</p><p>Before using v27, publish its updated Firestore security rules. The new rule grants each approved instructor access to their own week session.</p><button onclick=auth.signOut()>Sign out</button>`:'<p class=m>Reading the current shared week and your last session.</p>'}</div></main>`;return}
  const a=document.activeElement,f=a&&a.dataset&&a.dataset.f,ss=a&&typeof a.selectionStart==='number'?a.selectionStart:null,se=a&&typeof a.selectionEnd==='number'?a.selectionEnd:null;
  const tabs=[['att','Attendance'],['gr','Grades'],['set','Settings']];if(S.admin)tabs.push(['ins','Instructors']);if(!tabs.some(x=>x[0]===S.tab))S.tab='att';watchInstructors();watchStudentsForView();
- $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v31</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
+ $('#app').innerHTML=`<header><b>LabTrack <span style="font-size:12px;opacity:.75">v32</span></b><small>${esc(S.profile?.name||S.user.email)}${S.admin?' (admin)':''}</small><button class=g onclick="safeSignOut()">Sign out</button><span class="lab-save"></span><button class="g lab-retry" style="display:none" onclick="flushStudentWrites()">Retry save</button></header>
 <nav>${tabs.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="openTab('${k}')">${n}</button>`).join('')}</nav>
 <main>${scopeError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(scopeError)}</div>`:''}${visitorError?`<div class=card style="border-color:#c0392b;color:#b42318">${esc(visitorError)}</div>`:''}${!loadedStudents&&(S.tab==='att'||S.tab==='gr')?'<div class=card>Loading selected student roster from Firebase…</div>':''}${weekAdvanceError?`<div class=card style="border-color:#f1b6ad;color:var(--r)"><b>Firebase week synchronization error</b><p>${esc(weekAdvanceError)}</p><p class=m>Publish the v27 Firestore security rules and reopen LabTrack to retry.</p></div>`:''}${S.tab=='att'?vAtt():S.tab=='gr'?vGr():S.tab=='ins'?vIns():vSet()}</main>`;
  if(f){const e=document.querySelector(`[data-f="${f}"]`);if(e){e.focus();if(ss!==null&&typeof e.setSelectionRange==='function'){const L=String(e.value??'').length;e.setSelectionRange(Math.min(ss,L),Math.min(se??ss,L))}}}paintSaveState();requestAnimationFrame(()=>applySyncedScroll())}
@@ -619,22 +676,45 @@ function vAtt(){const l=S.labs.find(x=>x.id===S.lab),W=S.cfg.weeks,lim=Math.max(
  if(!l)return `<div class="card att-h5"><div class=att-h5-head><div class=att-h5-lab><div style="font-size:18px;font-weight:800">No labs yet</div><div class=m style="margin-top:5px">Add your first lab to start attendance.</div></div><button class=att-h5-icon title="Add lab" onclick=addLab()>＋</button></div></div>`;
  const visitors=S.studs.filter(s=>s.lab!==l.id&&(s.att||{})[S.aw]=='X'&&(s.alt||{})[S.aw]===l.id).sort(serialCmp),all=LS(l.id),shown=attStudents(),universal=attendanceUniversalMatches(),foreign=(S.aq&&shown.length===0)?universal.filter(s=>s.lab!==l.id):[],flagged=all.filter(s=>absN(s)>thr).length,locked=!!S.cfg.locked?.[S.aw];
  const visitingFocusSkipped=all.filter(s=>(s.att||{})[S.aw]==='X').length,visible=shown.slice(0,pageLimit('att',S.lab+'|'+S.aq));
- const searchText=!S.aq?`Showing ${all.length}`:shown.length?`Showing ${shown.length} in ${l.name}`:foreign.length?`Found ${foreign.length} in other ${foreign.length===1?'lab':'labs'}`:'No students found';
+ const searchText=!S.aq?`Showing ${all.length}`:shown.length?`Showing ${shown.length} in ${l.name}`:foreign.length?`Found ${foreign.length} in other ${foreign.length===1?'lab':'labs'}`:'No students found in the selected lab';
  return `<div class="card att-h5"><div class=att-h5-head><div class=att-h5-lab><select class=att-h5-labselect onchange="selectAttendanceLab(this.value)">${S.labs.map(x=>`<option value="${x.id}" ${x.id===S.lab?'selected':''}>${esc(x.name)}</option>`).join('')}</select><div class=att-h5-place><span>Place</span><input data-f=lp value="${esc(l.place)}" placeholder="Not set" onchange="db.doc('labs/${l.id}').update({place:this.value})"></div></div><div class=att-h5-labtools><button class=att-h5-icon title="Add lab" onclick=addLab()>＋</button><button class="att-h5-icon danger" title="Remove this lab" onclick=delLab()>×</button></div></div>
  <div class=att-h5-session><div class=att-h5-session-title><span>Attendance session · Shared default: Week ${currentSharedWeek().week}${S.aw!==currentSharedWeek().week?' · Viewing Week '+S.aw:''}</span><span class="badge ${locked?'warn':'blue'}">${locked?'Locked':'Unlocked'}</span></div><div class=att-h5-session-body><label>Session week<select onchange="selectAttendanceWeek(this.value)">${rng(W).map(w=>`<option value="${w}" ${w===S.aw?'selected':''}>Week ${w}</option>`).join('')}</select></label><label>Session date<input type=date data-f=wd value="${esc((l.dates||{})[S.aw]||'')}" onchange="setWeekDate(${S.aw},this.value)"></label>${S.admin?`<button class="g weeklock" onclick="lock(${S.aw})">${locked?'Unlock':'Lock'} Week ${S.aw}</button>`:'<span></span>'}</div></div>
  <div class=att-h5-actions><button class="g grow" onclick=startAttendanceFocus() ${locked&&!S.admin?'disabled':''}>Focus mode${S.aq?' · filtered':''}</button><button class=grow onclick=startQrAttendance() ${locked&&!S.admin?'disabled':''}>▣ Scan QR</button><button class=grow onclick=visitorModal() ${locked&&!S.admin?'disabled':''}>+ Visiting student</button><button class="g grow" onclick=openExamAttendanceExport()>Exam attendance sheets ↓</button>${flagged?`<span class="badge warn">⚠ ${flagged} warning${flagged==1?'':'s'}</span>`:''}</div><div class=att-h5-policy><span class="badge blue">Other-lab allowance: ${lim}</span>${visitingFocusSkipped?`<span class="badge blue">Focus skips ${visitingFocusSkipped} visiting student${visitingFocusSkipped===1?'':'s'} this week</span>`:''}<span class=badge>Warning after &gt; ${thr} absences</span></div>
- <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search all labs by serial, ID or name" oninput="searchAttendanceInput(this.value)"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';render()">Clear</button>':''}</div>
- <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><input type=file id=f2 hidden accept=".xlsx,.xls,.csv" onchange="imp(this,1)"><button class=g onclick="$('#f1').click()">Safely update SIS roster (.xls)</button><button class=g onclick="$('#f2').click()">Upload course serials</button>${S.admin?'<button class=g onclick="generateSerials(\'missing\')">Assign missing serials</button><button class=g onclick="generateSerials(\'all\')">Rebuild serials</button>':''}<button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button><button class=g onclick=openExamAttendanceExport()>Exam attendance sheets (all labs)</button><button class=g onclick=exAllStudentsExcel()>All students Excel</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
- ${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class="namecell ${flag?'flagname':''}"><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class="badge blue">Att ${ac}</span>${s.st&&s.st!==SL[0]?`<span class="badge warn">${esc(s.st)}</span>`:''}${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ Abs ${bc}</button>`:`<span class=badge>Abs ${bc}</span>`}<span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">Other ${xc}/${lim}</span><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${rng(W).map(w=>{const v=a[w]||'',title=(l.dates||{})[w]?`Week ${w} · ${shortDate((l.dates||{})[w])}`:`Week ${w}`,extra=v=='X'?` · Attended in ${labName((s.alt||{})[w])}`:'';return `<div class=attcell><button title="${esc(title+extra)}" class="attplain ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="if(syncClickGuard())return;mark('${s._}',${w},'${v}')"><span class=attweek>W${w}${S.cfg.locked?.[w]?' 🔒':''}</span><span class=attmark>${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</span></button></div>`}).join('')}</div></div></div></div>`}).join('')}</div>`:foreign.length?`<div class=externalresults><div class=externalresults-title>Student${foreign.length===1?'':'s'} found outside ${esc(l.name)}</div>${foreign.map(s=>`<div class=externalstudent><div><div class=externalstudent-name>${esc(s.nm||'Unnamed student')}</div><div class=externalstudent-meta>Serial ${esc(s.sn||'—')} · ID ${esc(s.sid||'—')}</div></div><div class=externalstudent-action><span class=badge>${esc(labName(s.lab))}</span><button onclick="goToAttendanceLab('${s.lab}')">Go to ${esc(labName(s.lab))}</button></div></div>`).join('')}</div>`:'<div class="card emptyresults">No students match your search in any lab.</div>'}${moreStudents('att',shown.length,visible.length)}`}
+ <div class=searchbar><input data-f=aq value="${esc(S.aq)}" placeholder="Search this lab, or enter an exact student ID" oninput="searchAttendanceInput(this.value)"><span class=searchcount>${esc(searchText)}</span>${S.aq?'<button class=g onclick="S.aq=\'\';externalSearchDocs=[];render()">Clear</button><button class=g onclick=searchAllLabsExplicit()>Search all labs</button>':''}${externalSearchState?'<span class=m>'+esc(externalSearchState)+'</span>':''}</div>
+ <details class=att-h5-tools><summary>Roster & export</summary><div class=row><input id=a1 data-f=a1 placeholder=Serial style="width:70px"><input id=a2 data-f=a2 placeholder=ID style="width:110px"><input id=a3 data-f=a3 placeholder=Name><button onclick=addSt()>Add student</button></div><div class=row><input type=file id=f1 hidden accept=".xls" onchange="imp(this,0)"><button class=g onclick="$('#f1').click()">Safely update SIS roster (.xls)</button><button class=g onclick="openLectureSerialImport()">Lecture SIS serials</button>${S.admin?'<button class=g onclick="generateSerials(\'all\')">Rebuild by lecture</button>':''}<button class=g onclick=openQrStickers()>QR stickers</button><button class=g onclick=exLab()>Export lab Excel</button><button class=g onclick=openExamAttendanceExport()>Exam attendance sheets (all labs)</button><button class=g onclick=exAllStudentsExcel()>All students Excel</button><button class=g onclick=exAllStudentsJson()>JSON backup</button></div></details>${visitors.length?`<div class=visitlist><b>Visitors in Week ${S.aw}${(l.dates||{})[S.aw]?' · '+esc(shortDate((l.dates||{})[S.aw])):''}</b>${visitors.map(s=>`<div class=visititem><span>${esc(s.nm)} <span class=m>(${esc(s.sid||'no ID')} · home: ${esc(labName(s.lab))})</span></span><button class=g onclick="clearVisitor('${s._}',${S.aw})" ${locked&&!S.admin?'disabled':''}>Remove</button></div>`).join('')}</div>`:''}</div>
+ ${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const a=s.att||{},ac=attN(s),bc=absN(s),xc=altN(s),flag=bc>thr;return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class="namecell ${flag?'flagname':''}"><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class="badge blue">Att ${ac}</span>${s.st&&s.st!==SL[0]?`<span class="badge warn">${esc(s.st)}</span>`:''}${flag?`<button class=warnbtn onclick="warnStudent('${s._}')">⚠ Abs ${bc}</button>`:`<span class=badge>Abs ${bc}</span>`}<span class="badge ${xc>=lim&&lim>0?'warn':'blue'}">Other ${xc}/${lim}</span><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${rng(W).map(w=>{const v=a[w]||'',title=(l.dates||{})[w]?`Week ${w} · ${shortDate((l.dates||{})[w])}`:`Week ${w}`,extra=v=='X'?` · Attended in ${labName((s.alt||{})[w])}`:'';return `<div class=attcell><button title="${esc(title+extra)}" class="attplain ${v}" ${S.cfg.locked?.[w]&&!S.admin?'disabled':''} onclick="if(syncClickGuard())return;mark('${s._}',${w},'${v}')"><span class=attweek>W${w}${S.cfg.locked?.[w]?' 🔒':''}</span><span class=attmark>${v=='P'?'✓':v=='A'?'✕':v=='X'?'↗':'·'}</span></button></div>`}).join('')}</div></div></div></div>`}).join('')}</div>`:foreign.length?`<div class=externalresults><div class=externalresults-title>Student${foreign.length===1?'':'s'} found outside ${esc(l.name)}</div>${foreign.map(s=>`<div class=externalstudent><div><div class=externalstudent-name>${esc(s.nm||'Unnamed student')}</div><div class=externalstudent-meta>Serial ${esc(s.sn||'—')} · ID ${esc(s.sid||'—')}</div></div><div class=externalstudent-action><span class=badge>${esc(labName(s.lab))}</span><button onclick="goToAttendanceLab('${s.lab}')">Go to ${esc(labName(s.lab))}</button></div></div>`).join('')}</div>`:'<div class="card emptyresults">No students match in this lab. For a name or partial ID, choose “Search all labs”.</div>'}${moreStudents('att',shown.length,visible.length)}`}
 
 function setWeekDate(w,v){if(S.lab)db.doc('labs/'+S.lab).update({['dates.'+w]:v})}
 function goToAttendanceLab(id){if(!S.labs.some(l=>l.id===id))return;selectAttendanceLab(id)}
-function mark(id,w,cur){if(cur==='X'&&!confirm('This student already attended another lab this week. Remove the visiting attendance record?'))return;let n=cur==''?'P':cur=='P'?'A':'';const u={['att.'+w]:n==''?FV():n,['alt.'+w]:FV()};St(id).update(u)}
+async function mark(id,w,cur){
+ if(cur==='X'&&!confirm('This student attended another lab this week. Remove that visiting attendance?'))return;
+ const n=cur===''?'P':cur==='P'?'A':'';
+ try{await db.runTransaction(async tx=>{
+  const ref=St(id),snap=await tx.get(ref);if(!snap.exists)throw new Error('Student no longer exists.');
+  const live=snap.data(),current=(live.att||{})[w]||'';
+  if(current!==cur)throw new Error('Another instructor changed this attendance mark. Refresh and review the latest status before trying again.');
+  tx.update(ref,{['att.'+w]:n===''?FV():n,['alt.'+w]:FV()});
+ })}catch(e){alert('Attendance was not overwritten: '+e.message)}
+}
 function lock(w){if(S.admin)Cf().update({['locked.'+w]:!S.cfg.locked?.[w]})}
 function addLab(){const n=prompt('Lab name or number');if(n)db.collection('labs').add({name:n.trim(),place:'',dates:{}}).then(r=>{S.lab=r.id})}
 async function delLab(){if(!loadedStudents)return alert('Wait for the lab roster to load.');if(!confirm('Remove this lab and all its students?'))return;try{const b=db.batch();LS(S.lab).forEach(s=>b.delete(St(s._)));b.delete(db.doc('labs/'+S.lab));await b.commit();invalidateRosterCache()}catch(e){alert('Could not remove lab: '+e.message)}}
 function nextSerialNumber(roster=S.studs){const used=new Set(roster.map(s=>+s.sn).filter(n=>Number.isInteger(n)&&n>0));let i=1;while(used.has(i))i++;return i}
-async function addSt(){const n=$('#a3')?.value.trim(),i=$('#a2')?.value.trim();if(!n&&!i)return;try{const roster=await allStudentsOnce({fresh:true});const explicit=$('#a1')?.value.trim();if(i&&roster.some(s=>norm(s.sid)===norm(i)))return alert('This student ID already exists in another lab. Move the existing student instead of duplicating their record.');await db.collection('students').add({lab:S.lab,sn:explicit||String(nextSerialNumber(roster)),sid:i,nm:n,att:{},alt:{},g:{}});invalidateRosterCache();renderSoon()}catch(e){alert('Could not add student: '+e.message)}}
+async function addSt(){
+ const nm=$('#a3')?.value.trim()||'',sid=$('#a2')?.value.trim()||'';
+ if(!nm&&!sid)return;if(!sid)return alert('A student ID is required to prevent duplicate student records.');
+ try{
+  const existing=await db.collection('students').where('sid','==',sid).limit(2).get({source:'server'});
+  if(!existing.empty)return alert('This student ID already exists. Move the existing student instead of duplicating the record.');
+  const ref=db.collection('students').doc(sisNewDocId(sid));
+  const created=await db.runTransaction(async tx=>{
+   const snap=await tx.get(ref);if(snap.exists)return false;
+   tx.set(ref,{lab:S.lab,sn:'',sid,nm,att:{},alt:{},g:{}});return true;
+  });
+  if(!created)return alert('That student was just added on another device.');
+  invalidateRosterCache();renderSoon();alert('Student added. Upload their lecture SIS roster to assign the correct course serial.');
+ }catch(e){alert('Could not add student: '+e.message)}
+}
 function delSt(id){if(confirm('Remove this student?'))St(id).delete()}
 let VISITOR={pool:[],query:'',selected:null};
 async function visitorModal(){const l=S.labs.find(x=>x.id===S.lab),w=S.aw;if(!l)return;if(S.cfg.locked?.[w]&&!S.admin)return alert('This week is locked.');VISITOR.query='';VISITOR.selected=null;try{const rows=await allStudentsOnce();if(S.lab!==l.id||S.aw!==w)return;VISITOR.pool=rows.filter(s=>s.lab!==S.lab).sort(serialCmp);if(!VISITOR.pool.length)return alert('There are no students in other labs.');}catch(e){return alert('Could not search students from other labs: '+e.message)}$('#modal').innerHTML=`<div class=visitorov role=dialog aria-modal=true aria-label="Add visiting student"><div class=visitorpanel><div class=visitorhead><div class=grow><h3>Add visiting student</h3><div class=m>Week ${w}${(l.dates||{})[w]?' · '+esc(shortDate((l.dates||{})[w])):''} · attending ${esc(l.name)}</div></div><button type=button class=g onclick=closeVisitor()>Close</button></div><input id=visitorSearch class=visitorsearch type=search inputmode=search autocomplete=off autocorrect=off autocapitalize=off spellcheck=false placeholder="Search serial, ID, name or home lab"><div class=visitorhint>Students from all other labs are listed below. Tap a student to continue.</div><div id=visitorResults class=visitorresults></div></div></div>`;const inp=$('#visitorSearch'),handler=()=>renderVisitorResults(inp?.value||'');if(inp){inp.addEventListener('input',handler,{passive:true});inp.addEventListener('keyup',handler,{passive:true});inp.addEventListener('search',handler,{passive:true})}renderVisitorResults('');setTimeout(()=>{try{inp?.focus({preventScroll:true})}catch(_){try{inp?.focus()}catch(__){}}},80)}
@@ -642,28 +722,60 @@ function closeVisitor(){$('#modal').innerHTML=''}
 function renderVisitorResults(q){VISITOR.query=String(q??'');const nq=norm(q),box=$('#visitorResults');if(!box)return;const list=VISITOR.pool.filter(s=>{if(!nq)return true;const hay=norm(`${s.sn||''} ${s.sid||''} ${s.nm||''} ${labName(s.lab)}`);return hay.includes(nq)}).slice(0,200);box.innerHTML=list.length?list.map(s=>`<button type=button class="visitorrow ${VISITOR.selected===s._?'visitorselected':''}" onclick="selectVisitor('${s._}')"><span class=visitorserial>${esc(s.sn||'—')}</span><span class=visitormain><b>${esc(s.nm||'Unnamed student')}</b><small>${esc(s.sid||'No ID')}</small></span><span class=visitorlab>${esc(labName(s.lab))}</span></button>`).join(''):`<div class=visitorempty>No student matches this search.</div>`}
 function filterVisitor(q){renderVisitorResults(q)}
 function selectVisitor(id){VISITOR.selected=id;const s=VISITOR.pool.find(x=>x._===id),box=$('#visitorResults');if(!s||!box)return;const used=altN(s),lim=Math.max(0,+S.cfg.altLabLimit||0),w=S.aw,cur=(s.att||{})[w]||'',where=cur==='X'?labName((s.alt||{})[w]):cur==='P'?'Present in home lab':cur==='A'?'Absent in home lab':'Not marked';box.innerHTML=`<div class=visitorchoice><h3>${esc(s.nm||'Unnamed student')}</h3><div class=m>${esc(s.sid||'No ID')} · Serial ${esc(s.sn||'—')} · Home: ${esc(labName(s.lab))}</div><div class=row><span class="badge ${used>=lim&&lim>0?'warn':'blue'}">Other-lab attendance ${used}/${lim}</span><span class=badge>${esc(where)}</span></div><div class=row><button type=button onclick="saveVisitor('${s._}')">Mark attended here</button><button type=button class=g onclick="renderVisitorResults(VISITOR.query)">Back to results</button></div></div>`}
-async function saveVisitor(id){id=id||VISITOR.selected;let s=VISITOR.pool.find(x=>x._===id);if(!s)return alert('Choose a student.');try{const latest=await St(id).get({source:'server'});if(!latest.exists)return alert('This student was removed.');s={_:id,...latest.data()};}catch(e){return alert('Could not verify visiting attendance: '+e.message)}const w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0);const cur=(s.att||{})[w]||'',used=altN(s),oldAlt=(s.alt||{})[w];if(cur!=='X'&&used>=lim)return alert(`${s.nm} has already used ${used}/${lim} other-lab attendances.`);if(lim<1&&cur!=='X')return alert('Other-lab attendance allowance is currently 0.');if(cur==='P'&&!confirm('This student is already marked present in the home lab for this week. Replace it with attendance in this lab?'))return;if(cur==='X'&&oldAlt&&oldAlt!==S.lab&&!confirm(`This student is already recorded as attending ${labName(oldAlt)} this week. Move the visiting attendance to ${labName(S.lab)}?`))return;try{await St(id).update({['att.'+w]:'X',['alt.'+w]:S.lab});invalidateRosterCache();closeVisitor()}catch(e){alert('Could not save visiting attendance: '+(e?.message||e))}}
-function clearVisitor(id,w){if(S.cfg.locked?.[w]&&!S.admin)return;St(id).update({['att.'+w]:FV(),['alt.'+w]:FV()})}
+async function saveVisitor(id){
+ id=id||VISITOR.selected;const chosen=VISITOR.pool.find(x=>x._===id);if(!chosen)return alert('Choose a student.');
+ const w=S.aw,lim=Math.max(0,+S.cfg.altLabLimit||0),here=S.lab;
+ try{
+  // No separate read before transaction, and do not silently replace
+  // another instructor's existing visiting attendance.
+  const result=await db.runTransaction(async tx=>{
+   const ref=St(id),doc=await tx.get(ref);if(!doc.exists)throw new Error('Student no longer exists.');
+   const s=doc.data(),cur=(s.att||{})[w]||'',oldAlt=(s.alt||{})[w],used=rng(S.cfg.weeks).filter(k=>(s.att||{})[k]==='X').length;
+   if(s.lab===here)throw new Error('Student is now enrolled in this lab. Mark attendance normally.');
+   if(cur==='X'&&oldAlt===here)return 'already';
+   if(cur==='X'||cur==='P')throw new Error('Student has already attended another lab. Their record is protected.');
+   if(lim<1||used>=lim)throw new Error(`Other-lab allowance reached (${used}/${lim}).`);
+   tx.update(ref,{['att.'+w]:'X',['alt.'+w]:here});return 'saved';
+  });
+  invalidateRosterCache();closeVisitor();if(result==='already')alert('This student is already marked as visiting this lab.');
+ }catch(e){alert('Visiting attendance not changed: '+e.message)}
+}
+async function clearVisitor(id,w){
+ if(S.cfg.locked?.[w]&&!S.admin)return;
+ try{await db.runTransaction(async tx=>{
+  const ref=St(id),d=await tx.get(ref);if(!d.exists)return;
+  const s=d.data();if((s.att||{})[w]!=='X'||(s.alt||{})[w]!==S.lab)
+   throw new Error('Visiting attendance changed elsewhere. No record was deleted.');
+  tx.update(ref,{['att.'+w]:FV(),['alt.'+w]:FV()});
+ })}catch(e){alert(e.message)}
+}
 async function warnStudent(id){const s=S.studs.find(x=>x._===id);if(!s)return;const n=absN(s),t=Math.max(0,+S.cfg.absenceWarn||0),msg=`Attendance warning: ${s.nm}${s.sid?' ('+s.sid+')':''} has ${n} recorded absences, exceeding the course threshold of ${t}. Please review your attendance record.`;try{if(navigator.share){await navigator.share({title:'Attendance warning',text:msg});return}if(navigator.clipboard){await navigator.clipboard.writeText(msg);alert('Warning copied. You can paste it into WhatsApp, email, or another message.');return}}catch(e){if(e?.name==='AbortError')return}prompt('Copy this warning:',msg)}
 
 /* ---------- Student note and transfer (keeps existing document ID and all history) ---------- */
+let STUDENT_EDIT_BASE=null;
 function studentDetails(id){
  const s=S.studs.find(x=>x._===id);if(!s)return alert('Student not found.');
+ STUDENT_EDIT_BASE={id,lab:s.lab,st:s.st,note:s.note};
  const box=$('#studentmodal');if(!box)return;
- box.innerHTML=`<div class=studenteditov role=dialog aria-modal=true aria-label="Student details"><div class="card studenteditpanel"><div class=row style="justify-content:space-between;align-items:start"><div><h3>Student details</h3><div class=m>${esc(s.nm||'Unnamed student')} · ID ${esc(s.sid||'—')} · Serial ${esc(s.sn||'—')}</div></div><button class=g type=button onclick=closeStudentDetails()>Close</button></div><label>Student note<textarea id=studentNote rows=5 placeholder="Write a note about this student (visible to approved instructors)">${esc(s.note||'')}</textarea></label><label>Assigned lab<select id=studentNewLab>${S.labs.map(l=>`<option value="${esc(l.id)}" ${s.lab===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></label><label>Academic status<select id=studentNewStatus>${SL.map(o=>`<option value="${esc(o)}" ${(s.st||SL[0])===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label><p class=m>Changing the lab moves the same student record to the new roster. All existing grades, weekly attendance and visiting-lab history are retained.</p><div class=row><button type=button onclick="saveStudentDetails('${id}')">Save changes</button><button type=button class=g onclick=closeStudentDetails()>Cancel</button></div></div></div>`;
+ box.innerHTML=`<div class=studenteditov role=dialog aria-modal=true aria-label="Student details"><div class="card studenteditpanel"><div class=row style="justify-content:space-between;align-items:start"><div><h3>Student details</h3><div class=m>${esc(s.nm||'Unnamed student')} · ID ${esc(s.sid||'—')} · Serial ${esc(s.sn||'—')}${s.lecture?' · Lecture '+esc(s.lecture):''}</div></div><button class=g type=button onclick=closeStudentDetails()>Close</button></div><label>Student note<textarea id=studentNote rows=5 placeholder="Write a note about this student (visible to approved instructors)">${esc(s.note||'')}</textarea></label><label>Assigned lab<select id=studentNewLab>${S.labs.map(l=>`<option value="${esc(l.id)}" ${s.lab===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></label><label>Academic status<select id=studentNewStatus>${SL.map(o=>`<option value="${esc(o)}" ${(s.st||SL[0])===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label><p class=m>Changing the lab moves the same student record to the new roster. All existing grades, weekly attendance and visiting-lab history are retained.</p><div class=row><button type=button onclick="saveStudentDetails('${id}')">Save changes</button><button type=button class=g onclick=closeStudentDetails()>Cancel</button></div></div></div>`;
 }
 function closeStudentDetails(){const box=$('#studentmodal');if(box)box.innerHTML=''}
 async function saveStudentDetails(id){
  const s=S.studs.find(x=>x._===id);if(!s)return alert('Student no longer exists.');
  const note=$('#studentNote')?.value.trim()||'',lab=$('#studentNewLab')?.value,st=$('#studentNewStatus')?.value||SL[0];
  if(!lab||!S.labs.some(l=>l.id===lab))return alert('Choose a valid lab.');
- if(lab!==s.lab&&!confirm(`Move ${s.nm||s.sid} from ${labName(s.lab)} to ${labName(lab)}?\n\nAll attendance, grades, visiting history, and notes will remain unchanged.`))return;
- const button=$('#studentmodal button[onclick^="saveStudentDetails"]');if(button)button.disabled=true;
+ if(lab!==s.lab&&!confirm(`Move ${s.nm||s.sid} from ${labName(s.lab)} to ${labName(lab)}?\n\nAll existing attendance, grades and notes are preserved.`))return;
+ const btn=$('#studentmodal button[onclick^="saveStudentDetails"]');if(btn)btn.disabled=true;
  try{
-  await St(id).update({lab,st,note:note||FV()});invalidateRosterCache();
-  s.lab=lab;s.note=note;s.st=st;
-  closeStudentDetails();render();if(FO)renderFocus();
- }catch(e){alert('Could not save student details: '+e.message);if(button)button.disabled=false}
+  await db.runTransaction(async tx=>{
+   const ref=St(id),doc=await tx.get(ref);if(!doc.exists)throw new Error('Student no longer exists.');
+   const live=doc.data(),base=STUDENT_EDIT_BASE;
+   if(!base||base.id!==id||live.lab!==base.lab||!sameStoredValue(live.st,base.st)||!sameStoredValue(live.note,base.note))
+    throw new Error('Another instructor changed this student since you opened the form. Close and reopen to review the latest changes.');
+   tx.update(ref,{lab,st,note:note||FV()});
+  });
+  invalidateRosterCache();STUDENT_EDIT_BASE=null;closeStudentDetails();render();if(FO)renderFocus();
+ }catch(e){alert('Student details were NOT overwritten: '+e.message);if(btn)btn.disabled=false}
 }
 
 /* ---------- QR attendance ---------- */
@@ -682,9 +794,34 @@ async function restartQrCamera(){await stopQrCameraOnly();setTimeout(()=>startQr
 async function stopQrCameraOnly(){const q=QRSCAN.scanner;QRSCAN.scanner=null;QRSCAN.started=false;if(q){try{await q.stop()}catch(_){}try{q.clear()}catch(_){}}document.querySelectorAll('#qr-reader video').forEach(v=>{try{v.srcObject?.getTracks?.().forEach(t=>t.stop())}catch(_){}})}
 async function stopQrAttendance(keepModal=false){await stopQrCameraOnly();QRSCAN.busy=false;if(!keepModal)$('#modal').innerHTML=''}
 async function qrDecoded(decoded){const code=String(decoded??'').trim(),now=Date.now();if(!code||QRSCAN.busy)return;if(code===QRSCAN.last&&now-QRSCAN.lastAt<2200)return;QRSCAN.last=code;QRSCAN.lastAt=now;QRSCAN.busy=true;try{await qrMarkStudent(code)}finally{setTimeout(()=>QRSCAN.busy=false,350)}}
-async function qrMarkStudent(studentId){let matches;try{const q=await db.collection('students').where('sid','==',studentId).limit(2).get({source:'server'});matches=q.docs.map(d=>({_:d.id,...d.data()}))}catch(e){qrBeep(false);qrShow('err','QR student lookup failed',null,e.message);return}if(!matches.length){qrBeep(false);qrShow('err','Student ID not found',null,studentId);return}if(matches.length>1){qrBeep(false);qrShow('err','Duplicate Student ID in LabTrack',null,`${studentId} matches ${matches.length} records. Fix the roster before scanning.`);return}const s=matches[0],w=S.aw,l=S.labs.find(x=>x.id===S.lab);if(!l){qrBeep(false);qrShow('err','No attendance lab selected',s);return}if(S.cfg.locked?.[w]&&!S.admin){qrBeep(false);qrShow('err',`Week ${w} is locked`,s);return}const cur=(s.att||{})[w]||'';
- if(s.lab===S.lab){if(cur==='X'){qrBeep(false);qrShow('warn','Already attended as a visiting student',s,'Week '+w+' · '+labName((s.alt||{})[w]));return}if(cur==='P'){qrShow('warn','Already marked present',s,`${labName(s.lab)} · Week ${w}`);return}await St(s._).update({['att.'+w]:'P',['alt.'+w]:FV()});QRSCAN.count++;qrBeep(true);qrShow('ok','Present',s,`${labName(s.lab)} · Week ${w}`);return}
- const lim=Math.max(0,+S.cfg.altLabLimit||0),used=altN(s),alreadyHere=cur==='X'&&(s.alt||{})[w]===S.lab;if(alreadyHere){qrShow('warn','Already marked here as a visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${used}/${lim}`);return}if(lim<1){qrBeep(false);qrShow('err','Other-lab attendance is disabled',s,`Home lab: ${labName(s.lab)}`);return}if(cur!=='X'&&used>=lim){qrBeep(false);qrShow('err','Other-lab allowance reached',s,`${used}/${lim} already used · Home lab: ${labName(s.lab)}`);return}await St(s._).update({['att.'+w]:'X',['alt.'+w]:S.lab});QRSCAN.count++;qrBeep(true);qrShow('ok','Present here as visiting student',s,`${labName(s.lab)} → ${l.name} · Other-lab ${cur==='X'?used:used+1}/${lim}`)}
+async function qrMarkStudent(studentId){
+ let matches;
+ try{const q=await db.collection('students').where('sid','==',studentId).limit(2).get({source:'server'});matches=q.docs.map(d=>({_:d.id,...d.data()}))}
+ catch(e){qrBeep(false);qrShow('err','QR student lookup failed',null,e.message);return}
+ if(!matches.length){qrBeep(false);qrShow('err','Student ID not found',null,studentId);return}
+ if(matches.length>1){qrBeep(false);qrShow('err','Duplicate Student ID in LabTrack',null,studentId);return}
+ const s=matches[0],w=S.aw,l=S.labs.find(x=>x.id===S.lab);
+ if(!l){qrBeep(false);qrShow('err','No selected lab',s);return}
+ if(S.cfg.locked?.[w]&&!S.admin){qrBeep(false);qrShow('err','Week is locked',s);return}
+ try{
+  const result=await db.runTransaction(async tx=>{
+   const ref=St(s._),d=await tx.get(ref);if(!d.exists)throw new Error('Student record was deleted.');
+   const live=d.data(),cur=(live.att||{})[w]||'',oldAlt=(live.alt||{})[w],used=rng(S.cfg.weeks).filter(i=>(live.att||{})[i]==='X').length;
+   if(live.lab===S.lab){
+    if(cur==='X')return {kind:'warn',title:'Already attended as a visitor',detail:'Attendance preserved'};
+    if(cur==='P')return {kind:'warn',title:'Already marked present',detail:'No change needed'};
+    tx.update(ref,{['att.'+w]:'P',['alt.'+w]:FV()});return {kind:'ok',title:'Present',detail:labName(live.lab)};
+   }
+   if(cur==='X'&&oldAlt===S.lab)return {kind:'warn',title:'Already attended in this lab',detail:'No change needed'};
+   if(cur==='X'||cur==='P')return {kind:'warn',title:'Already attended elsewhere',detail:'Existing attendance preserved'};
+   const limit=Math.max(0,+S.cfg.altLabLimit||0);
+   if(limit<1||used>=limit)return {kind:'warn',title:'Visiting allowance reached',detail:`${used}/${limit} visits`};
+   tx.update(ref,{['att.'+w]:'X',['alt.'+w]:S.lab});return {kind:'ok',title:'Attended as visiting student',detail:`Home lab: ${labName(live.lab)}`};
+  });
+  if(result.kind==='ok')QRSCAN.count++;
+  qrBeep(result.kind==='ok');qrShow(result.kind,result.title,s,result.detail);
+ }catch(e){qrBeep(false);qrShow('err','QR attendance not saved',s,e.message)}
+}
 
 /* QR stickers: QR content is exactly the Student ID; identity labels are outside the sticker and are hidden when printing. */
 function openQrStickers(){if(typeof QRCode==='undefined')return alert('The QR generator library did not load. Check your internet connection and reload LabTrack.');const scope=S.lab||'',list=(scope?LS(scope):allBySerial()).filter(s=>String(s.sid??'').trim());$('#modal').innerHTML=`<div class=qrprintov><div class=qrprintpanel><div class=qrprinthead><h2>Student QR stickers</h2><div class=qrprintscope><span class=m>Scope</span><select id=qrprintscope onchange="renderQrStickers(this.value)"><option value="">All labs</option>${S.labs.map(l=>`<option value="${l.id}" ${l.id===scope?'selected':''}>${esc(l.name)}</option>`).join('')}</select><button onclick=printQrStickers()>Print</button><button class=g onclick=closeQrStickers()>Close</button></div></div><p class=qrprintnote>Each printed sticker is QR-only. The printed QR itself is 18 mm square inside a 25 mm white square, giving it a clear quiet zone for faster scanning. The on-screen name/ID is only for matching stickers to students and is hidden when printing. QR content = exact Student ID.</p><div id=qrprintgrid class=qrprintgrid></div></div></div>`;renderQrStickers(scope)}
@@ -694,22 +831,40 @@ function closeQrStickers(){document.body.classList.remove('qrprinting');$('#moda
 
 /* ---------- Excel import / export ---------- */
 
-/* Serial generation uses a stable global ID-order and never rewrites attendance or grades. */
-async function generateSerials(mode='missing'){
- if(!S.admin)return alert('Only an administrator can generate serial numbers.');
- let globalRoster;try{globalRoster=await allStudentsOnce({fresh:true})}catch(e){return alert('Unable to load all students: '+e.message)}
- const xs=[...globalRoster].sort((a,b)=>String(a.sid||'').localeCompare(String(b.sid||''),undefined,{numeric:true})||String(a.nm||'').localeCompare(String(b.nm||'')));
- const existing=new Set(),duplicates=new Set();
- if(mode!=='all')for(const s of xs){const n=Number(String(s.sn??'').trim());if(Number.isSafeInteger(n)&&n>0){if(existing.has(n))duplicates.add(n);existing.add(n)}}
- const candidates=mode==='all'?xs:xs.filter(s=>String(s.sn??'').trim()==='');
- if(!candidates.length)return alert('No students need serial numbers.');
- const msg=mode==='all'?`Rebuild serial numbers 1–${xs.length} globally in student-ID order? This changes existing serials but preserves all student records, attendance, grades and notes.`:`Assign the ${candidates.length} missing serial numbers globally in student-ID order? Existing serial values will be preserved.${duplicates.size?' Existing duplicate numbers: '+[...duplicates].join(', '):''}`;
- if(!confirm(msg))return;
- const ops=[];let n=1;
- for(const student of candidates){while(existing.has(n))n++;existing.add(n);ops.push({t:'update',ref:St(student._),data:{sn:String(n++)}})}
- try{await commitOps(ops);invalidateRosterCache();alert(`Assigned ${ops.length} serial numbers. Existing attendance and grades were not changed.`)}catch(e){alert('Serial generation failed: '+e.message)}
+/* Global serial coordination is locked in cfg/main, which already allows admin writes.
+   Lock lives on the same shared Firebase document across all devices. */
+function lectureComparator(a,b){
+ const x=Number(a.lecture),y=Number(b.lecture),lx=Number.isInteger(x)&&x>0?x:1e9,ly=Number.isInteger(y)&&y>0?y:1e9;
+ if(lx!==ly)return lx-ly;
+ const id=String(a.sid||'').localeCompare(String(b.sid||''),undefined,{numeric:true,sensitivity:'base'});
+ return id||String(a.nm||'').localeCompare(String(b.nm||''),undefined,{numeric:true,sensitivity:'base'});
 }
-
+async function withSerialLock(work){
+ if(!S.admin)throw new Error('Only a LabTrack administrator can change course serial numbers.');
+ const ref=Cf(),token=`${S.user.uid}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+ const now=Date.now();
+ await db.runTransaction(async tx=>{
+  const d=await tx.get(ref);if(!d.exists)throw new Error('Course configuration is missing.');
+  const lock=d.data().serialImportLock;
+  if(lock&&Number(lock.expiresAt)>now)throw new Error('Another instructor is assigning course serials. Try again after they finish.');
+  tx.update(ref,{serialImportLock:{token,owner:S.user.uid,expiresAt:now+30*60*1000}});
+ });
+ try{return await work()}
+ finally{
+  try{await db.runTransaction(async tx=>{
+   const d=await tx.get(ref);if(d.exists&&d.data().serialImportLock?.token===token)tx.update(ref,{serialImportLock:FV()});
+  })}catch(e){console.warn('Serial lock release failed, will expire automatically',e)}
+ }
+}
+async function generateSerials(mode='all'){
+ if(!S.admin)return alert('Only an administrator can assign course serials.');
+ if(!confirm('Renumber students globally by Lecture 1, then Lecture 2, and so on, with Student IDs ascending inside each lecture? Students without a lecture are placed last. Student grades and lab assignments will not change.'))return;
+ try{const changed=await withSerialLock(async()=>{
+  const all=await allStudentsOnce({fresh:true}),sorted=[...all].sort(lectureComparator),ops=[];
+  sorted.forEach((s,i)=>{if(String(s.sn||'')!==String(i+1))ops.push({t:'update',ref:St(s._),data:{sn:String(i+1)}})});
+  await commitOps(ops);invalidateRosterCache();return ops.length;
+ });alert(`Updated ${changed} serial numbers in lecture order.`)}catch(e){alert('Serial numbering stopped: '+e.message)}
+}
 function parse(rows){if(!rows.length)return[];const h=rows[0].map(x=>String(x).toLowerCase().trim()),f=r=>h.findIndex(x=>r.test(x));
  let c={sn:f(/serial|^sn$|^no\.?$|^#$/),sid:f(/\bid\b|code/),nm:f(/name/)},st=1;if(c.sid<0&&c.nm<0){st=0;c=rows[0].length>2?{sn:0,sid:1,nm:2}:{sn:-1,sid:0,nm:1}}
  return rows.slice(st).filter(r=>r.some(x=>x!=='')).map(r=>({sn:c.sn<0?'':String(r[c.sn]??'').trim(),sid:c.sid<0?'':String(r[c.sid]??'').trim(),nm:c.nm<0?'':String(r[c.nm]??'').trim()}))}
@@ -819,32 +974,132 @@ function sisNewDocId(sid){const id='sis_'+encodeURIComponent(norm(sid));if(new T
 async function confirmSisRosterUpdate(){
  const si=SIS_IMPORT;if(!si||si.busy)return;
  const status=$('#sisStatus');si.busy=true;const btn=$('#sisApply');if(btn)btn.disabled=true;
- if(status)status.textContent='Rechecking all student IDs before saving…';
+ if(status)status.textContent='Checking only new student IDs before saving…';
  try{
-  if(si.lab!==S.lab)throw new Error('The selected lab changed. Cancel and re-import the file.');
-  const fresh=await allStudentsOnce({fresh:true}),now=planSisRoster(si.rows,fresh,si.lab);
-  if(sisPlanSignature(now)!==sisPlanSignature(si.plan)){
-   si.plan=now;si.busy=false;renderSisPreview();const freshStatus=$('#sisStatus');if(freshStatus)freshStatus.textContent='The roster changed since the preview. Review the updated counts before saving.';return;
-  }
-  if(!now.newStudents.length){si.busy=false;renderSisPreview();return}
-  const existingSerials=new Set(fresh.map(s=>Number(s.sn)).filter(n=>Number.isSafeInteger(n)&&n>0));let serial=1,created=0,skipped=0;
-  // New IDs use a stable document path with a Firestore transaction. Two
-  // simultaneous uploads cannot overwrite the same new student's document.
-  for(const q of now.newStudents){
-   while(existingSerials.has(serial))serial++;
-   const assigned=serial++;existingSerials.add(assigned);
+  if(si.lab!==S.lab)throw new Error('The selected lab changed. Re-import the file.');
+  if(!si.plan.newStudents.length){si.busy=false;renderSisPreview();return}
+  let created=0,skipped=0;
+  for(const q of si.plan.newStudents){
+   // Only new IDs are rechecked, instead of fetching all students a second time.
+   const existing=await db.collection('students').where('sid','==',q.sid).limit(2).get({source:'server'});
+   if(!existing.empty){skipped++;continue}
    const ref=db.collection('students').doc(sisNewDocId(q.sid));
-   const didCreate=await db.runTransaction(async tx=>{
-    const snap=await tx.get(ref);
-    if(snap.exists)return false;
-    tx.set(ref,{lab:si.lab,sn:String(assigned),sid:q.sid,nm:q.nm,att:{},alt:{},g:{}});
-    return true;
+   const inserted=await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);if(snap.exists)return false;
+    // A new student's serial is assigned later using the ordered lecture SIS workflow.
+    tx.set(ref,{lab:si.lab,sn:'',sid:q.sid,nm:q.nm,att:{},alt:{},g:{}});return true;
    });
-   if(didCreate)created++;else skipped++;
+   if(inserted)created++;else skipped++;
   }
   invalidateRosterCache();si.busy=false;closeSisPreview();
-  alert(`Safe SIS update complete for ${labName(si.lab)}.\nNew students added: ${created}\nExisting in this lab: ${now.same.length} (unchanged)\nPreviously moved to other labs: ${now.other.length} (unchanged)\nAbsent from uploaded SIS: ${now.missing.length} (retained)\nDuplicate/invalid ID entries: ${now.ambiguous.length+now.repeated.length+now.invalid.length} (skipped)${skipped?'\nNew IDs already created by another update: '+skipped:''}\nNo existing student attendance, grades, or lab assignments were changed.`)
- }catch(e){si.busy=false;if(status)status.textContent='Update stopped: '+e.message+(e.message.includes('permission')?' Check Firebase access.':'')+' If any earlier new students were added, the next preview will recognize them instead of adding duplicates.';if(btn)btn.disabled=false;console.error(e)}
+  alert(`Safe SIS update complete for ${labName(si.lab)}.\nNew students added: ${created}\nAlready existing: ${si.plan.same.length+si.plan.other.length} (unchanged)\nMissing from SIS: ${si.plan.missing.length} (retained)\nConflicts/repeated IDs: ${skipped+si.plan.ambiguous.length+si.plan.repeated.length} (skipped)\nNew students are unnumbered until Lecture SIS serial numbering is applied.\nAttendance, grades, notes and manually moved lab assignments were not changed.`);
+ }catch(e){si.busy=false;if(status)status.textContent='Update stopped: '+e.message+' Review the next import preview before retrying.';if(btn)btn.disabled=false;console.error(e)}
+}
+
+/* v32: sequential Lecture 1 → Lecture 2 → Lecture 3 SIS imports.
+   Only lecture membership and serial number fields are written; lab stays unchanged. */
+let LECTURE_IMPORT=null;
+function openLectureSerialImport(){
+ if(!S.admin)return alert('Only administrators can import lecture serial rosters.');
+ $('#modal').innerHTML=`<div class=ov><div class="card roster-dialog"><h2>Lecture SIS → Course serials</h2>
+ <p class=m>Upload Lecture 1, then Lecture 2, Lecture 3, etc. Students are sorted by <b>Student ID ascending</b> within each lecture. Their course serials become consecutive: Lecture 1 first, then Lecture 2, etc. Lab transfers and all scores remain unchanged.</p>
+ <label>Lecture number<select id=lectureNum>${rng(30).map(n=>`<option value="${n}">Lecture ${n}</option>`).join('')}</select></label>
+ <label>SIS roster file (.xls or .xlsx)<input id=lectureFile type=file accept=".xls,.xlsx"></label>
+ <p class=m>Oracle SIS files containing an HTML table with .xls extension and standard Excel workbooks are accepted. The student ID must be in column B and name in column C, or be identified by column headers.</p>
+ <p class=m>New/missing IDs and students already assigned to another lecture are reported and <b>never moved to another lab</b>. Missing students must first be added through the safe lab roster importer.</p>
+ <div class=row><button onclick=previewLectureImport()>Preview this lecture</button><button class=g onclick="$('#modal').innerHTML=''">Cancel</button></div></div></div>`;
+}
+function parseLectureRows(raw){
+ const clean=x=>String(x??'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+ const scan=raw.slice(0,20).map((row,i)=>({i,row:row.map(v=>clean(v).toLowerCase())}));
+ let header=scan.find(o=>o.row.some(v=>/^(student\s*)?(id|student id|student number|student code|university id)$/.test(v))&&o.row.some(v=>/name|student name/.test(v)));
+ let start=0,sidCol=1,nameCol=2;
+ if(header){start=header.i+1;sidCol=header.row.findIndex(v=>/^(student\s*)?(id|student id|student number|student code|university id)$/.test(v));nameCol=header.row.findIndex(v=>/name/.test(v))}
+ const out=[],seen=new Set();out.invalid=[];out.duplicates=[];
+ for(const row of raw.slice(start)){
+  const sid=clean(row[sidCol]),nm=clean(row[nameCol]);if(!sid&&!nm)continue;
+  if(!sid||!nm||/^(id|student id)$/i.test(sid)){out.invalid.push({sid,nm});continue}
+  const key=norm(sid);if(seen.has(key)){out.duplicates.push({sid,nm});continue}
+  seen.add(key);out.push({sid,nm});
+ }
+ return out;
+}
+async function parseLectureFile(file){
+ const buf=await file.arrayBuffer(),bytes=new Uint8Array(buf);
+ const txt=new TextDecoder('utf-8').decode(bytes.slice(0,Math.min(bytes.length,2048)));
+ if(/<\s*(html|table|tr|!doctype)/i.test(txt))return parseSisRoster(new TextDecoder('utf-8').decode(bytes));
+ if(typeof XLSX==='undefined')throw new Error('Excel reader did not load. Check internet access.');
+ const wb=XLSX.read(buf,{type:'array',raw:true});
+ if(!wb.SheetNames.length)throw new Error('Workbook is empty.');
+ return parseLectureRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:false}));
+}
+async function previewLectureImport(){
+ const num=Number($('#lectureNum')?.value),f=$('#lectureFile')?.files?.[0];
+ if(!Number.isInteger(num)||num<1)return alert('Choose a valid lecture number.');
+ if(!f||!/\.xlsx?$/i.test(f.name))return alert('Choose the original SIS .xls or an Excel .xlsx file.');
+ try{
+  const rows=await parseLectureFile(f);if(!rows.length)throw new Error('No valid IDs/names. Expected student ID in column B and name in column C (or named headers).');
+  rows.sort((a,b)=>String(a.sid).localeCompare(String(b.sid),undefined,{numeric:true,sensitivity:'base'})||a.nm.localeCompare(b.nm));
+  LECTURE_IMPORT={num,rows,duplicates:rows.duplicates||[],invalid:rows.invalid||[],name:f.name};
+  // Load only ONCE to prepare the preview; confirmation gets the same set after an exclusive lock.
+  const all=await allStudentsOnce({fresh:true});LECTURE_IMPORT.plan=makeLecturePlan(LECTURE_IMPORT,all);
+  renderLecturePreview();
+ }catch(e){alert('Lecture SIS preview failed: '+e.message)}
+}
+function makeLecturePlan(job,students){
+ const ids=new Map();for(const s of students){const k=norm(s.sid);if(!k)continue;const matches=ids.get(k)||[];matches.push(s);ids.set(k,matches)}
+ const matched=[],unknown=[],duplicate=[],otherLecture=[];
+ for(const row of job.rows){const hits=ids.get(norm(row.sid))||[];
+  if(hits.length===0)unknown.push(row);
+  else if(hits.length>1)duplicate.push({row,count:hits.length});
+  else if(Number(hits[0].lecture)>0&&Number(hits[0].lecture)!==job.num)otherLecture.push({row,student:hits[0]});
+  else matched.push({row,student:hits[0]});
+ }
+ return {matched,unknown,duplicate,otherLecture,total:students.length};
+}
+function renderLecturePreview(){
+ const job=LECTURE_IMPORT;if(!job)return;const p=job.plan;
+ const sample=p.matched.slice(0,25).map((x,i)=>`<div class=roster-person>${esc(x.row.sid)} · ${esc(x.row.nm)} ${x.student.lecture?'(already Lecture '+x.student.lecture+')':''}</div>`).join('');
+ $('#modal').innerHTML=`<div class=ov><div class="card roster-dialog"><h2>Preview Lecture ${job.num} SIS</h2><p class=m>${esc(job.name)} · sorted by Student ID ascending. Upload Lecture 1 first, then Lecture 2 and so on. This preview does not save anything.</p>
+ <div class=roster-stats><div class=roster-stat><b>${p.matched.length}</b><span>Matched, eligible IDs</span></div><div class=roster-stat><b>${p.unknown.length}</b><span>Not in LabTrack — skipped</span></div><div class=roster-stat><b>${p.otherLecture.length}</b><span>Assigned to another lecture — skipped</span></div><div class=roster-stat><b>${p.duplicate.length+(job.duplicates?.length||0)+(job.invalid?.length||0)}</b><span>Duplicate / invalid — skipped</span></div></div>
+ <details class=roster-group open><summary>First matched students (ascending ID)</summary><div class=roster-list>${sample||'No matched students'}</div></details>
+ ${p.unknown.length?`<details class=roster-group><summary>Unknown IDs (${p.unknown.length}) — import via safe lab roster first</summary><div class=roster-list>${p.unknown.map(x=>`<div class=roster-person>${esc(x.sid)} · ${esc(x.nm)}</div>`).join('')}</div></details>`:''}
+ ${p.otherLecture.length?`<details class=roster-group><summary>Already in another lecture (${p.otherLecture.length}) — skipped</summary><div class=roster-list>${p.otherLecture.map(x=>`<div class=roster-person>${esc(x.row.sid)} — Lecture ${x.student.lecture}</div>`).join('')}</div></details>`:''}
+ <p class=roster-safe><b>Safe changes:</b> Only matched students' lecture and global serial fields will change. Their lab, notes, attendance and grades are never touched. Students without an uploaded lecture are numbered after the assigned lectures (provisionally).</p>
+ <div id=lectureProgress class=m></div><div class=roster-buttons><button class=g onclick=openLectureSerialImport()>Back</button><button id=lectureApply ${p.matched.length?'':'disabled'} onclick=applyLectureSerials()>Apply Lecture ${job.num} and renumber</button></div></div></div>`;
+}
+async function applyLectureSerials(){
+ const job=LECTURE_IMPORT;if(!job||!S.admin)return;
+ const btn=$('#lectureApply');if(btn)btn.disabled=true;
+ const progress=$('#lectureProgress');if(progress)progress.textContent='Locking global serial assignment…';
+ try{
+  const result=await withSerialLock(async()=>{
+   const latest=await allStudentsOnce({fresh:true}),plan=makeLecturePlan(job,latest);
+   const signature=p=>JSON.stringify([
+    p.matched.map(x=>`${norm(x.row.sid)}:${x.student._}:${x.student.lecture||''}`).sort(),
+    p.unknown.map(x=>norm(x.sid)).sort(),
+    p.duplicate.map(x=>norm(x.row.sid)).sort(),
+    p.otherLecture.map(x=>`${norm(x.row.sid)}:${x.student._}:${x.student.lecture}`).sort()
+   ]);
+   if(signature(plan)!==signature(job.plan))
+    throw new Error('Student roster/lecture membership changed after preview. Reopen the file and review the new preview.');
+   // Assign lecture metadata only for confirmed matched records, then compute
+   // a single global order; IDs are unique across labs and lecture membership.
+   const byDoc=new Map(latest.map(x=>[x._,{...x}]));
+   for(const x of plan.matched)byDoc.get(x.student._).lecture=job.num;
+   const ordered=[...byDoc.values()].sort(lectureComparator),ops=[],oldById=new Map(latest.map(x=>[x._,x]));
+   for(let i=0;i<ordered.length;i++){
+    const item=ordered[i],old=oldById.get(item._),data={};
+    if(String(old.sn||'')!==String(i+1))data.sn=String(i+1);
+    if(old.lecture!==item.lecture&&item.lecture===job.num)data.lecture=job.num;
+    if(Object.keys(data).length)ops.push({t:'update',ref:St(item._),data});
+   }
+   if(progress)progress.textContent=`Saving ${ops.length} student serial/lecture records…`;
+   await commitOps(ops);invalidateRosterCache();return {matched:plan.matched.length,updated:ops.length,missing:plan.unknown.length,other:plan.otherLecture.length,total:ordered.length};
+  });
+  LECTURE_IMPORT=null;$('#modal').innerHTML='';
+  alert(`Lecture ${job.num} applied.\nMatched students: ${result.matched}\nStudents globally renumbered/updated: ${result.updated}\nUnknown IDs skipped: ${result.missing}\nStudents belonging to another lecture skipped: ${result.other}\nCourse serials now run from 1 to ${result.total}, with Lecture 1, Lecture 2, Lecture 3… first; unassigned students at the end.\nNo labs, attendance or grades were changed.`);
+ }catch(e){if(progress)progress.textContent='Not completed: '+e.message;if(btn)btn.disabled=false;alert('Lecture import stopped: '+e.message+' If the connection stopped during the numbering stage, use Rebuild by lecture after connectivity returns to repair a partially completed numbering job.')}
 }
 
 function imp(inp,kind){const f=inp.files[0];if(!f)return;
@@ -875,7 +1130,7 @@ async function exAllStudentsExcel(){
   for(const key of Object.keys(student.g||{}))if(!configured.has(key))archivedGrades.add(key)
  }
  const weeks=[...seenWeeks].sort((a,b)=>a-b),extraGrades=[...archivedGrades].sort();
- const cols=['Lab','Serial','Student ID','Student name','Status','Student note',
+ const cols=['Lab','Serial','Student ID','Student name','Lecture','Status','Student note',
   ...weeks.flatMap(w=>[`Week ${w} attendance`,`Week ${w} visiting lab`,`Week ${w} date`]),
   'Present (incl. visits)','Absent','Visiting sessions',
   ...items.map(i=>i.n+(i.max?' / '+i.max:'')),...extraGrades.map(k=>'Archived grade · '+k)];
@@ -884,10 +1139,10 @@ async function exAllStudentsExcel(){
   const l=S.labs.find(l=>l.id===s.lab),marks=s.att||{},alt=s.alt||{},calcGrades=calc(s),raw=s.g||{};
   const values=weeks.flatMap(w=>[marks[w]==='P'?'Present':marks[w]==='A'?'Absent':marks[w]==='X'?'Present (visiting)':'',marks[w]==='X'?labName(alt[w]):'',(l?.dates||{})[w]||'']);
   const grades=items.map(i=>i.t==='in'?(raw[i.k]??''):(calcGrades[i.k]??''));
-  rows.push([l?.name||'',String(s.sn??''),String(s.sid??''),s.nm||'',s.st||'',s.note||'',...values,attN(s),absN(s),altN(s),...grades,...extraGrades.map(k=>raw[k]??'')]);
+  rows.push([l?.name||'',String(s.sn??''),String(s.sid??''),s.nm||'',s.lecture||'',s.st||'',s.note||'',...values,attN(s),absN(s),altN(s),...grades,...extraGrades.map(k=>raw[k]??'')]);
  });
  const wb=XLSX.utils.book_new(),sheet=XLSX.utils.aoa_to_sheet(rows);
- sheet['!cols']=cols.map((x,i)=>({wch:i===3?35:i===5?40:/Week/.test(x)?20:18}));
+ sheet['!cols']=cols.map((x,i)=>({wch:i===3?35:i===6?40:/Week/.test(x)?20:18}));
  sheet['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,rows.length-1),c:cols.length-1}})};
  XLSX.utils.book_append_sheet(wb,sheet,'All students');
  XLSX.writeFile(wb,'LabTrack_All_Students_'+cairoYmd()+'.xlsx');
@@ -1052,7 +1307,7 @@ ${inp.length?`<div class=row style="border-top:1px solid var(--b);padding-top:10
 <div class=searchbar><input data-f=gq value="${esc(S.gq)}" placeholder="Search student by serial, ID or name" oninput="S.gq=this.value;renderSearch()"><span class=searchcount>Showing ${shown.length} of ${all.length}</span>${S.gq?'<button class=g onclick="S.gq=\'\';render()">Clear</button>':''}</div>
 <div class=gradefilters><label>Academic status<select onchange="S.gstatus=this.value;render()"><option value="">All statuses</option>${SL.map(x=>`<option value="${esc(x)}" ${S.gstatus===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Filter by grade<select onchange="S.gmetric=this.value;render()"><option value="">Any grade</option><option value="__total" ${S.gmetric==='__total'?'selected':''}>Sum of input scores</option>${it.map(x=>`<option value="${esc(x.k)}" ${S.gmetric===x.k?'selected':''}>${esc(x.n)}</option>`).join('')}</select></label><label>Minimum<input type=number step=any value="${esc(S.gmin||'')}" placeholder="Min" oninput="S.gmin=this.value;renderSearch()"></label><label>Maximum<input type=number step=any value="${esc(S.gmax||'')}" placeholder="Max" oninput="S.gmax=this.value;renderSearch()"></label><button class=g onclick="S.gstatus='';S.gmetric='';S.gmin='';S.gmax='';render()">Reset filters</button></div>
 <p class=m>The identity row stays compact and fixed. Scores use compact Design-A-sized cells in one continuous lower row. Drag the score strip horizontally and all students move together. Search also filters Focus mode.</p></div>
-${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const m=calc(s),g=s.g||{};return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class=namecell><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class=badge>${esc(labName(s.lab))}</span><div class=statusinline><span>Status</span><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select></div><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${it.map(i=>i.t=='in'?`<div class=gradecell><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=scorebox><input data-f="${s._}_${i.k}" inputmode=decimal ${g[i.k]==='Abs'?'disabled':''} value="${g[i.k]==='Abs'?'':esc(g[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)"><button class="absbtn ${g[i.k]==='Abs'?'on':''}" title="Mark absent" onclick="if(syncClickGuard())return;toggleScoreAbs('${s._}','${i.k}')">ABS</button></div></div>`:`<div class="gradecell calc"><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=calcvalue>${m[i.k]??'—'}</div></div>`).join('')}</div></div></div></div>`}).join('')}</div>`:'<div class="card emptyresults">No students match your search.</div>'}${moreStudents('gr',shown.length,visible.length)}`}
+${shown.length?`<div class=studenttable><div class=studenthdr><div>Serial</div><div>ID</div><div>Name</div></div>${visible.map(s=>{const m=calc(s),g=s.g||{};return `<div class=studentgroup><div class=studentmain><div class=serialcell>${esc(s.sn||'—')}</div><div class=idcell>${esc(s.sid||'—')}</div><div class=namecell><div class=studentname>${esc(s.nm||'Unnamed student')}</div><div class=rowmeta><span class=badge>${esc(labName(s.lab))}</span>${s.lecture?`<span class="badge blue">Lecture ${esc(s.lecture)}</span>`:''}<div class=statusinline><span>Status</span><select onchange="setSt('${s._}',this.value)">${SL.map(o=>`<option ${(s.st||SL[0])==o?'selected':''}>${o}`).join('')}</select></div><button class=studenttool onclick="studentDetails('${s._}')">${s.note?'📝 Note / Move':'✎ Note / Move'}</button></div></div></div><div class=studentdetail><div class=syncstrip onpointerdown="syncDragStart(event,this)" onpointermove="syncDragMove(event)" onpointerup="syncDragEnd(event)" onpointercancel="syncDragEnd(event)" onwheel="syncWheel(event)"><div class=syncinner>${it.map(i=>i.t=='in'?`<div class=gradecell><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=scorebox><input data-f="${s._}_${i.k}" inputmode=decimal ${g[i.k]==='Abs'?'disabled':''} value="${g[i.k]==='Abs'?'':esc(g[i.k]??'')}" onchange="setG('${s._}','${i.k}',this.value)"><button class="absbtn ${g[i.k]==='Abs'?'on':''}" title="Mark absent" onclick="if(syncClickGuard())return;toggleScoreAbs('${s._}','${i.k}')">ABS</button></div></div>`:`<div class="gradecell calc"><div class=gradehead>${esc(i.n)}${i.max?` / ${esc(i.max)}`:''}</div><div class=calcvalue>${m[i.k]??'—'}</div></div>`).join('')}</div></div></div></div>`}).join('')}</div>`:'<div class="card emptyresults">No students match your search.</div>'}${moreStudents('gr',shown.length,visible.length)}`}
 function setG(id,k,v){v=String(v).trim();const i=S.cfg.items.find(x=>x.k===k&&x.t==='in');if(!i)return;const n=+v;
  if(v!==''&&(!Number.isFinite(n)||n<0||(i.max>0&&n>+i.max))){alert(`Enter a score from 0 to ${i.max}.`);renderSoon();return}
  queueStudentWrite(id,{['g.'+k]:v===''?DEL:n});}
@@ -1105,7 +1360,7 @@ async function focusAttendanceSave(v){
    const snap=await transaction.get(ref);
    if(!snap.exists)throw new Error('Student no longer exists.');
    const live=snap.data(),mark=(live.att||{})[w];
-   if(live.lab!==lab||mark==='X')throw Object.assign(new Error('Student moved labs or is already marked as attending another lab. The existing record was protected.'),{code:'focus/skip-visiting'});
+   if(live.lab!==lab||mark==='X'||(mark||'')!==((s.att||{})[w]||''))throw Object.assign(new Error('Attendance changed on another device, student moved labs, or visiting attendance already exists. Existing record protected.'),{code:'focus/skip-visiting'});
    transaction.update(ref,{['att.'+w]:v,['alt.'+w]:FV()});
   });
   focusStep(1)
@@ -1150,7 +1405,7 @@ function vSet(){const c=S.cfg,T={in:'Score',att:'Attendance',grp:'Group',sum:'Su
 <label>Absence warning threshold <span class=m>(warning appears after the student exceeds this number)</span><input type=number min=0 max=30 value="${c.absenceWarn??3}" onchange="Cf().set({absenceWarn:Math.max(0,+this.value||0)},{merge:true})"></label></div>
 <div class=card><h3>Grading items</h3>${c.items.map(i=>`<div class=row><div style="flex:1"><b>${esc(i.n)}</b> <span class=m>${T[i.t]}, max ${i.max}<br>${esc(desc(i))}</span></div>${S.admin?`<button class=g onclick="editItem('${i.k}')">Edit</button><button class=d onclick="delItem('${i.k}')">&#10005;</button>`:''}</div>`).join('')}
 ${S.admin?`<div class=row><button onclick="editItem('','in')">Add score</button><button onclick="editItem('','grp')">Add group</button><button onclick="editItem('','sum')">Add sum</button></div>
-<p class=m>Group: choose assessments and a calculation preset (or a custom highest-N, average/sum and multiplier). Sum: add any items together, including groups and other sums.</p>`:''}</div><div class=card><h3>Firebase read optimization</h3><p class=m>Attendance watches only the selected lab and this week’s visitors. Other-lab search and visitor selection fetch the full roster on demand (temporarily cached in memory). All-lab grading watches everyone until you choose one lab or leave Grades. Exports retrieve a fresh complete roster.</p><label class=ck><input type=checkbox ${localStorage.getItem('labtrack-device-cache')==='1'?'checked':''} onchange="changeDeviceCache(this.checked)">Keep an offline Firestore cache on this trusted device</label><p class=m>Optional. Turn this on only on a private locked device. Turning it off attempts to clear previously stored student data. Browser cache may reduce repeated reconnect reads, but Firebase billing depends on server activity.${cacheWarning?' '+esc(cacheWarning):''}</p></div><div class=card><h3>Student data & backups</h3><p class=m>Export every student from every lab, including attendance and visiting-lab records, scores, and student notes. Excel is a readable table; JSON keeps original document IDs and complete data for a future restore. These exports do not modify Firebase.</p><div class=row><button onclick=openExamAttendanceExport()>Exam attendance sheets · by lab</button><button onclick=exAllStudentsExcel()>Export all students · Excel</button><button class=g onclick=exAllStudentsJson()>Download JSON backup</button></div></div>${tplCards(c)}${securityCard()}`}
+<p class=m>Group: choose assessments and a calculation preset (or a custom highest-N, average/sum and multiplier). Sum: add any items together, including groups and other sums.</p>`:''}</div><div class=card><h3>Firebase read optimization</h3><p class=m>Attendance watches only the selected lab and this week’s visitors. Exact student-ID search uses a targeted query; searching every lab by name or partial ID is an explicit on-demand action. Visitor selection and exports fetch the full roster only when needed. All-lab grading watches everyone until you choose one lab or leave Grades. Exports retrieve a fresh complete roster.</p><label class=ck><input type=checkbox ${localStorage.getItem('labtrack-device-cache')==='1'?'checked':''} onchange="changeDeviceCache(this.checked)">Keep an offline Firestore cache on this trusted device</label><p class=m>Optional. Turn this on only on a private locked device. Turning it off attempts to clear previously stored student data. Browser cache may reduce repeated reconnect reads, but Firebase billing depends on server activity.${cacheWarning?' '+esc(cacheWarning):''}</p></div><div class=card><h3>Student data & backups</h3><p class=m>Export every student from every lab, including attendance and visiting-lab records, scores, and student notes. Excel is a readable table; JSON keeps original document IDs and complete data for a future restore. These exports do not modify Firebase.</p><div class=row><button onclick=openExamAttendanceExport()>Exam attendance sheets · by lab</button><button onclick=exAllStudentsExcel()>Export all students · Excel</button><button class=g onclick=exAllStudentsJson()>Download JSON backup</button></div></div>${tplCards(c)}${securityCard()}`}
 
 function bandRow(r={},idx=0){return `<div class="row band-row" style="border-top:1px solid var(--b);padding-top:6px"><label>Condition<select class=band-op><option value="&lt;=" ${r.op==='<='?'selected':''}>≤</option><option value="=" ${r.op==='='?'selected':''}>=</option><option value="&gt;=" ${r.op==='>='?'selected':''}>≥</option></select></label><label>Count<input class=band-n type=number min=0 value="${esc(r.n??0)}" style="width:90px"></label><label>Grade<input class=band-grade type=number min=0 step=.25 value="${esc(r.grade??0)}" style="width:90px"></label><button type=button class=d onclick="this.closest('.band-row').remove()">Remove</button></div>`}
 function addBandRow(){const div=document.createElement('div');div.innerHTML=bandRow({op:'<=',n:0,grade:0});$('#bandRows')?.appendChild(div.firstElementChild)}
